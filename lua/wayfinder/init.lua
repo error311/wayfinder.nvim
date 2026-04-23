@@ -1,0 +1,266 @@
+local config = require("wayfinder.config")
+local state = require("wayfinder.state")
+local layout = require("wayfinder.layout")
+local actions = require("wayfinder.actions")
+local highlights = require("wayfinder.highlights")
+local trail = require("wayfinder.trail")
+local symbol_util = require("wayfinder.util.symbol")
+local items = require("wayfinder.util.items")
+local paths = require("wayfinder.util.paths")
+local sources = {
+  lsp = require("wayfinder.sources.lsp"),
+  tests = require("wayfinder.sources.tests"),
+  git = require("wayfinder.sources.git"),
+}
+
+local M = {}
+
+local function source_key(target, symbol)
+  return table.concat({
+    target.path or "",
+    target.filetype or "",
+    symbol and symbol.text or "",
+  }, "|")
+end
+
+local function target_context()
+  local bufnr = vim.api.nvim_get_current_buf()
+  local path = vim.api.nvim_buf_get_name(bufnr)
+  return {
+    bufnr = bufnr,
+    path = path ~= "" and vim.fs.normalize(path) or nil,
+    filetype = vim.bo[bufnr].filetype,
+    cwd = paths.project_root(path, vim.uv.cwd()),
+  }
+end
+
+local function build_counts(session)
+  local counts = {
+    all = 0,
+    calls = 0,
+    refs = 0,
+    tests = 0,
+    git = 0,
+    trail = #trail.items(),
+  }
+
+  for _, item in ipairs(session.items) do
+    counts[item.facet] = (counts[item.facet] or 0) + 1
+    counts.all = counts.all + 1
+  end
+
+  session.counts = counts
+end
+
+local function filtered_items(session)
+  local all_items = {}
+  for _, item in ipairs(session.items) do
+    if session.facet == "all" or session.facet == item.facet then
+      table.insert(all_items, item)
+    end
+  end
+
+  if session.facet == "trail" then
+    all_items = trail.items()
+    for index, item in ipairs(all_items) do
+      local previous = all_items[index - 1]
+      local destination = string.format("%s:%d", paths.display(item.path, session.cwd), item.lnum or 1)
+
+      item.icon = index == 1 and config.values.icons.trail or "↳"
+      item.group = "Pinned Trail"
+      item.secondary = previous
+        and string.format("%02d  %s → %s", index, previous.label, destination)
+        or string.format("%02d  %s", index, destination)
+    end
+  end
+
+  if session.filter == "" then
+    return all_items
+  end
+
+  local needle = session.filter:lower()
+  return vim.tbl_filter(function(item)
+    return (item.label and item.label:lower():find(needle, 1, true))
+      or (item.secondary and item.secondary:lower():find(needle, 1, true))
+      or (item.detail and item.detail:lower():find(needle, 1, true))
+  end, all_items)
+end
+
+local function refresh_visible(session)
+  build_counts(session)
+  session.visible_items = filtered_items(session)
+  if #session.visible_items == 0 then
+    session.selection_index = 1
+    return
+  end
+
+  if session.selection_id then
+    for index, item in ipairs(session.visible_items) do
+      if item.id == session.selection_id then
+        session.selection_index = index
+        return
+      end
+    end
+  end
+
+  session.selection_index = math.min(session.selection_index or 1, #session.visible_items)
+  session.selection_id = session.visible_items[session.selection_index].id
+end
+
+local function aggregate_items(session)
+  local merged = {}
+  for _, key in ipairs({ "lsp", "tests", "git" }) do
+    vim.list_extend(merged, session.results[key].items)
+  end
+  table.sort(merged, items.score_sort)
+  session.items = merged
+  session.loading = session.results.lsp.loading or session.results.tests.loading or session.results.git.loading
+  refresh_visible(session)
+end
+
+local function keymaps()
+  local buffers = {
+    state.ui.facet_buf,
+    state.ui.list_buf,
+    state.ui.preview_buf,
+  }
+
+  for _, bufnr in ipairs(buffers) do
+    if bufnr and vim.api.nvim_buf_is_valid(bufnr) then
+      local map = function(lhs, rhs)
+        vim.keymap.set("n", lhs, rhs, { buffer = bufnr, nowait = true, silent = true })
+      end
+      map("j", actions.select_next)
+      map("k", actions.select_prev)
+      map("gg", actions.select_first)
+      map("G", actions.select_last)
+      map("<Down>", actions.select_next)
+      map("<Up>", actions.select_prev)
+      map("<PageDown>", actions.page_down)
+      map("<PageUp>", actions.page_up)
+      map("<C-d>", actions.page_down)
+      map("<C-u>", actions.page_up)
+      map("h", actions.prev_facet)
+      map("l", actions.next_facet)
+      map("<Right>", actions.next_facet)
+      map("<Left>", actions.prev_facet)
+      map("<Tab>", actions.next_facet)
+      map("<CR>", actions.jump)
+      map("s", actions.open_split)
+      map("v", actions.open_vsplit)
+      map("t", actions.open_tab)
+      map("p", actions.pin)
+      map("P", actions.open_trail)
+      map("dd", actions.remove_trail_item)
+      map("/", actions.filter)
+      map("r", actions.refresh)
+      map("d", actions.toggle_details)
+      map("q", actions.close)
+      map("<LeftMouse>", actions.select_item_under_cursor)
+      map("<2-LeftMouse>", actions.click_jump)
+      map("<ScrollWheelDown>", actions.select_next)
+      map("<ScrollWheelUp>", actions.select_prev)
+    end
+  end
+end
+
+local function create_session()
+  local target = target_context()
+  local symbol = symbol_util.detect()
+  local session = {
+    id = state.next_id(),
+    origin_win = vim.api.nvim_get_current_win(),
+    mode = symbol and "symbol" or "file",
+    subject = symbol and symbol.text or vim.fs.basename(target.path or ""),
+    symbol = symbol,
+    path = target.path,
+    cwd = target.cwd,
+    filetype = target.filetype,
+    bufnr = target.bufnr,
+    facet = symbol and "calls" or "all",
+    filter = "",
+    selection_index = 1,
+    selection_id = nil,
+    show_details = false,
+    loading = true,
+    counts = {
+      all = 0,
+      calls = 0,
+      refs = 0,
+      tests = 0,
+      git = 0,
+      trail = #trail.items(),
+    },
+    items = {},
+    visible_items = {},
+    results = {
+      lsp = { loading = true, items = {} },
+      tests = { loading = true, items = {} },
+      git = { loading = true, items = {} },
+    },
+  }
+
+  function session:refresh_visible()
+    refresh_visible(self)
+  end
+
+  function session:reload()
+    state.cache = {}
+    M.open()
+  end
+
+  return session, target
+end
+
+local function update_session(session, source_name, source_items)
+  if state.current ~= session then
+    return
+  end
+
+  session.results[source_name] = {
+    loading = false,
+    items = source_items or {},
+  }
+  aggregate_items(session)
+  layout.render(session)
+  keymaps()
+end
+
+local function load_source(session, target, symbol, source_name)
+  local key = source_name .. "::" .. source_key(target, symbol)
+  local cached = state.cache_get(key, config.values.cache_ttl_ms)
+  if cached then
+    update_session(session, source_name, cached)
+    return
+  end
+
+  sources[source_name].collect({
+    bufnr = target.bufnr,
+    path = target.path,
+    cwd = target.cwd,
+    filetype = target.filetype,
+    symbol = symbol,
+  }, function(found)
+    state.cache_set(key, found or {})
+    update_session(session, source_name, found or {})
+  end)
+end
+
+function M.setup(opts)
+  config.setup(opts)
+  highlights.setup()
+end
+
+function M.open()
+  local session, target = create_session()
+  state.current = session
+  aggregate_items(session)
+  layout.render(session)
+  keymaps()
+
+  load_source(session, target, session.symbol, "lsp")
+  load_source(session, target, session.symbol, "tests")
+  load_source(session, target, session.symbol, "git")
+end
+
+return M

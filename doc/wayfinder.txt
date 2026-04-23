@@ -1,0 +1,114 @@
+*wayfinder.nvim*     Explore connected code paths from the current symbol or file
+
+==============================================================================
+CONTENTS                                                *wayfinder-contents*
+
+1. Introduction ........................................ |wayfinder-intro|
+2. Command ............................................. |wayfinder-command|
+3. Keys ................................................ |wayfinder-keys|
+4. Configuration ....................................... |wayfinder-config|
+5. Result Types ........................................ |wayfinder-result-types|
+6. Demo ................................................ |wayfinder-demo|
+
+==============================================================================
+1. Introduction                                         *wayfinder-intro*
+
+wayfinder.nvim is a guided code exploration tool for the current symbol.
+
+It is not a general search tool and it does not try to replace Telescope or
+grep. It replaces the manual loop of jump, grep, back, open, back, and "where
+was that test again?"
+
+wayfinder.nvim opens a centered floating picker with three panes:
+
+  - facet rail
+  - result list
+  - preview
+
+It gathers:
+
+  - definitions
+  - references
+  - callers
+  - likely tests
+  - recent commits
+
+The Trail facet lets you pin items while exploring.
+If no symbol is detected under the cursor, it falls back to the current file.
+
+==============================================================================
+2. Command                                             *wayfinder-command*
+
+                                                        *:Wayfinder*
+:Wayfinder      Open Wayfinder for the current symbol or file.
+
+                                                   *<Plug>(WayfinderOpen)*
+<Plug>(WayfinderOpen)
+                Mapping target to open Wayfinder.
+
+==============================================================================
+3. Keys                                                   *wayfinder-keys*
+
+  j / k      Move selection
+  gg / G     First / last result
+  <PageUp>   Move up by a page
+  <PageDown> Move down by a page
+  <C-u>      Move up by half a page
+  <C-d>      Move down by half a page
+  h / l      Change facet
+  <Tab>      Next facet
+  <CR>       Jump
+  s          Open in split
+  v          Open in vsplit
+  t          Open in tab
+  p          Pin current item into Trail
+  P          Open Trail
+  dd         Remove current Trail item
+  /          Set local filter
+  d          Toggle optional details
+  r          Refresh
+  q          Close
+
+==============================================================================
+4. Configuration                                        *wayfinder-config*
+
+>
+  require("wayfinder").setup({
+    layout = {
+      width = 0.88,
+      height = 0.72,
+    },
+  })
+<
+
+==============================================================================
+5. Result Types                                  *wayfinder-result-types*
+
+  Calls
+      LSP definitions and callers for the symbol under the cursor.
+
+  Refs
+      Split into LSP References and Text Matches.
+
+  Tests
+      Heuristic likely-test matches for the file or symbol.
+
+  Git
+      Recent commits touching the current file.
+
+==============================================================================
+6. Demo                                                  *wayfinder-demo*
+
+The repo includes a small fixture app and a tiny demo LSP server.
+
+Run:
+>
+  nvim -u demo/minimal_init.lua demo/fixture-app/src/user_service.ts
+<
+
+Move onto |createUser| and run:
+>
+  :Wayfinder
+<
+
+vim:tw=78:ts=8:noet:ft=help:norl:

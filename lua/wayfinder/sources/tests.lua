@@ -1,0 +1,85 @@
+local async = require("wayfinder.util.async")
+local config = require("wayfinder.config")
+local items = require("wayfinder.util.items")
+local paths = require("wayfinder.util.paths")
+local text = require("wayfinder.util.text")
+
+local M = {}
+
+local function file_candidates(ctx, done)
+  async.system({ "git", "ls-files" }, { cwd = ctx.cwd }, function(result)
+    if result.code == 0 then
+      local lines = vim.split(result.stdout or "", "\n", { trimempty = true })
+      done(vim.tbl_map(function(path)
+        return paths.normalize(ctx.cwd .. "/" .. path)
+      end, lines))
+      return
+    end
+
+    done(vim.fs.find(function(name)
+      return name:match("%.lua$") or name:match("%.ts$") or name:match("%.tsx$") or name:match("%.js$")
+    end, {
+      path = ctx.cwd,
+      type = "file",
+      limit = 300,
+    }))
+  end)
+end
+
+local function score(path, ctx)
+  local score_value = 0
+  local basename = paths.basename(ctx.path or ""):gsub("%..+$", "")
+  local lower = path:lower()
+  local symbol = ctx.symbol and ctx.symbol.text:lower() or nil
+
+  if lower:match("test") or lower:match("spec") then
+    score_value = score_value + 40
+  end
+  if basename ~= "" and lower:find(basename:lower(), 1, true) then
+    score_value = score_value + 35
+  end
+  if symbol and lower:find(symbol, 1, true) then
+    score_value = score_value + 20
+  end
+  if lower:find("__tests__", 1, true) or lower:find("/tests/", 1, true) then
+    score_value = score_value + 10
+  end
+
+  return score_value
+end
+
+function M.collect(ctx, callback)
+  file_candidates(ctx, function(candidates)
+    local results = {}
+
+    for _, path in ipairs(candidates) do
+      if path ~= ctx.path then
+        local score_value = score(path, ctx)
+        if score_value > 0 then
+          table.insert(results, {
+            id = items.item_id({ "test", path }),
+            facet = "tests",
+            kind = "test",
+            label = text.line_at(path, 1) ~= "" and text.line_at(path, 1) or paths.basename(path),
+            path = path,
+            lnum = 1,
+            col = 1,
+            preview_range = { start = 1, ["end"] = 8 },
+            source = "test",
+            score = 10 + math.floor(score_value / 2),
+            badge = "TEST",
+            detail = paths.display(path, ctx.cwd),
+            secondary = paths.display(path, ctx.cwd),
+            group = "Likely Tests",
+            icon = config.values.icons.tests,
+          })
+        end
+      end
+    end
+
+    table.sort(results, items.score_sort)
+    callback(results)
+  end)
+end
+
+return M

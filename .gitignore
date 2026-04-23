@@ -1,0 +1,8 @@
+*.log
+*.tmp
+*.swp
+*.swo
+*.pyc
+/.DS_Store
+/.media-work
+__pycache__/
