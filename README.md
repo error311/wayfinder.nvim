@@ -62,7 +62,17 @@ require("wayfinder").setup({
 ## Command
 
 - `:Wayfinder`
+- `:WayfinderExportQuickfix`
+- `:WayfinderExportTrailQuickfix`
+- `:WayfinderTrailNext`
+- `:WayfinderTrailPrev`
+- `:WayfinderTrailOpen`
+- `:WayfinderTrailShow`
 - `<Plug>(WayfinderOpen)`
+- `<Plug>(WayfinderTrailNext)`
+- `<Plug>(WayfinderTrailPrev)`
+- `<Plug>(WayfinderTrailOpen)`
+- `<Plug>(WayfinderTrailShow)`
 
 Open it on a symbol for definitions, references, callers, likely tests, and recent commits.
 If there is no symbol under the cursor, it falls back to the current file.
@@ -71,6 +81,15 @@ Recommended mapping:
 
 ```lua
 vim.keymap.set("n", "<leader>wf", "<Plug>(WayfinderOpen)", { desc = "Wayfinder" })
+```
+
+Recommended Trail mappings:
+
+```lua
+vim.keymap.set("n", "<leader>wtn", "<Plug>(WayfinderTrailNext)", { desc = "Wayfinder Trail Next" })
+vim.keymap.set("n", "<leader>wtp", "<Plug>(WayfinderTrailPrev)", { desc = "Wayfinder Trail Prev" })
+vim.keymap.set("n", "<leader>wto", "<Plug>(WayfinderTrailOpen)", { desc = "Wayfinder Trail Open" })
+vim.keymap.set("n", "<leader>wts", "<Plug>(WayfinderTrailShow)", { desc = "Wayfinder Trail Show" })
 ```
 
 ## Default Keys
@@ -88,6 +107,7 @@ vim.keymap.set("n", "<leader>wf", "<Plug>(WayfinderOpen)", { desc = "Wayfinder" 
 - `t` open in tab
 - `p` pin into Trail
 - `P` open Trail immediately
+- `x` export current facet to quickfix
 - `dd` remove pinned trail item
 - `/` filter
 - `d` toggle details
@@ -100,6 +120,18 @@ Pinning behavior:
 - the first `p` pins the current item
 - after the second pin, Wayfinder switches to `Trail` automatically
 - the top bar shows a short Trail hint when you pin an item
+
+Trail commands outside Wayfinder:
+
+- `:WayfinderTrailNext` opens the next Trail item
+- `:WayfinderTrailPrev` opens the previous Trail item
+- `:WayfinderTrailOpen` opens the current Trail item
+- `:WayfinderTrailShow` opens Wayfinder on the Trail facet
+
+Quickfix export:
+
+- `:WayfinderExportQuickfix` exports the current visible facet in its current order
+- `:WayfinderExportTrailQuickfix` exports Trail in Trail order
 
 ## Result Types
 

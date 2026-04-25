@@ -1,6 +1,8 @@
 local layout = require("wayfinder.layout")
+local quickfix = require("wayfinder.util.quickfix")
 local state = require("wayfinder.state")
 local trail = require("wayfinder.trail")
+local open = require("wayfinder.util.open")
 local facets = require("wayfinder.render.facets")
 
 local M = {}
@@ -58,6 +60,16 @@ end
 local function selection_item()
   local session = current()
   return session and session.visible_items[session.selection_index] or nil
+end
+
+local function export_notice(session, message)
+  if session and layout.is_open() then
+    state.set_notice(message)
+    layout.render(session)
+    layout.focus_primary()
+  else
+    vim.notify(message, vim.log.levels.INFO)
+  end
 end
 
 function M.select_next()
@@ -209,20 +221,12 @@ local function open_item(item, opener)
 
   local target_win = session.origin_win
   layout.close()
+  state.current = nil
   if target_win and vim.api.nvim_win_is_valid(target_win) then
     vim.api.nvim_set_current_win(target_win)
   end
 
-  if opener == "split" then
-    vim.cmd.split(vim.fn.fnameescape(item.path))
-  elseif opener == "vsplit" then
-    vim.cmd.vsplit(vim.fn.fnameescape(item.path))
-  elseif opener == "tab" then
-    vim.cmd.tabedit(vim.fn.fnameescape(item.path))
-  else
-    vim.cmd.edit(vim.fn.fnameescape(item.path))
-  end
-  pcall(vim.api.nvim_win_set_cursor, 0, { item.lnum or 1, math.max((item.col or 1) - 1, 0) })
+  open.item(item, opener)
 end
 
 function M.jump()
@@ -264,6 +268,81 @@ function M.remove_trail_item()
       rerender()
     end
   end
+end
+
+function M.export_quickfix()
+  local session = current()
+  if not session then
+    vim.notify("Wayfinder: Wayfinder is not open", vim.log.levels.INFO)
+    return
+  end
+
+  local found = session.visible_items
+  if session.facet == "trail" then
+    found = vim.tbl_filter(function(item)
+      return item and item.path and item.path ~= "" and vim.uv.fs_stat(item.path) ~= nil
+    end, session.visible_items)
+  end
+
+  local count = quickfix.export(found, {
+    title = "Wayfinder " .. session.facet,
+  })
+  export_notice(session, string.format("Exported %d item(s) to quickfix", count))
+end
+
+function M.export_trail_quickfix()
+  local found = trail.valid_items()
+  if #found == 0 then
+    vim.notify("Wayfinder: Trail is empty", vim.log.levels.INFO)
+    return
+  end
+
+  local count = quickfix.export(found, {
+    title = "Wayfinder Trail",
+  })
+  export_notice(current(), string.format("Exported %d Trail item(s) to quickfix", count))
+end
+
+function M.trail_open()
+  local item, status = trail.seek(0)
+  if not item then
+    if status == "empty" then
+      vim.notify("Wayfinder: Trail is empty", vim.log.levels.INFO)
+    else
+      vim.notify("Wayfinder: Trail has no valid entries", vim.log.levels.INFO)
+    end
+    return
+  end
+
+  open.item(item, "edit")
+end
+
+function M.trail_next()
+  local item, status = trail.seek(1, { start = (trail.cursor() or 1) + 1 })
+  if not item then
+    if status == "empty" then
+      vim.notify("Wayfinder: Trail is empty", vim.log.levels.INFO)
+    else
+      vim.notify("Wayfinder: Trail has no valid entries", vim.log.levels.INFO)
+    end
+    return
+  end
+
+  open.item(item, "edit")
+end
+
+function M.trail_prev()
+  local item, status = trail.seek(-1, { start = (trail.cursor() or 1) - 1 })
+  if not item then
+    if status == "empty" then
+      vim.notify("Wayfinder: Trail is empty", vim.log.levels.INFO)
+    else
+      vim.notify("Wayfinder: Trail has no valid entries", vim.log.levels.INFO)
+    end
+    return
+  end
+
+  open.item(item, "edit")
 end
 
 function M.filter()

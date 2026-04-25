@@ -164,6 +164,7 @@ local function keymaps()
       map("t", actions.open_tab)
       map("p", actions.pin)
       map("P", actions.open_trail)
+      map("x", actions.export_quickfix)
       map("dd", actions.remove_trail_item)
       map("/", actions.filter)
       map("r", actions.refresh)
@@ -238,6 +239,9 @@ local function update_session(session, source_name, source_items)
   aggregate_items(session)
   layout.render(session)
   keymaps()
+  if layout.is_open() and not layout.interactive_window(vim.api.nvim_get_current_win()) then
+    layout.focus_primary()
+  end
 end
 
 local function load_source(session, target, symbol, source_name)
@@ -265,16 +269,54 @@ function M.setup(opts)
   highlights.setup()
 end
 
-function M.open()
+local function open_session(facet)
   local session, target = create_session()
+  if facet then
+    session.facet = facet
+    session.auto_facet_pending = false
+  end
   state.current = session
   aggregate_items(session)
   layout.render(session)
   keymaps()
+  layout.focus_primary()
 
   load_source(session, target, session.symbol, "lsp")
   load_source(session, target, session.symbol, "tests")
   load_source(session, target, session.symbol, "git")
+end
+
+function M.open()
+  open_session()
+end
+
+function M.export_quickfix()
+  actions.export_quickfix()
+end
+
+function M.export_trail_quickfix()
+  actions.export_trail_quickfix()
+end
+
+function M.trail_next()
+  actions.trail_next()
+end
+
+function M.trail_prev()
+  actions.trail_prev()
+end
+
+function M.trail_open()
+  actions.trail_open()
+end
+
+function M.trail_show()
+  if state.current and layout.is_open() then
+    actions.open_trail()
+    return
+  end
+
+  open_session("trail")
 end
 
 return M

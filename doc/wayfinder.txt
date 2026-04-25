@@ -6,9 +6,10 @@ CONTENTS                                                *wayfinder-contents*
 1. Introduction ........................................ |wayfinder-intro|
 2. Command ............................................. |wayfinder-command|
 3. Keys ................................................ |wayfinder-keys|
-4. Configuration ....................................... |wayfinder-config|
-5. Result Types ........................................ |wayfinder-result-types|
-6. Demo ................................................ |wayfinder-demo|
+4. Trail Commands ...................................... |wayfinder-trail-commands|
+5. Configuration ....................................... |wayfinder-config|
+6. Result Types ........................................ |wayfinder-result-types|
+7. Demo ................................................ |wayfinder-demo|
 
 ==============================================================================
 1. Introduction                                         *wayfinder-intro*
@@ -42,9 +43,58 @@ If no symbol is detected under the cursor, it falls back to the current file.
                                                         *:Wayfinder*
 :Wayfinder      Open Wayfinder for the current symbol or file.
 
+                                          *:WayfinderExportQuickfix*
+:WayfinderExportQuickfix
+                Export the current visible Wayfinder facet to quickfix.
+
+                                     *:WayfinderExportTrailQuickfix*
+:WayfinderExportTrailQuickfix
+                Export Trail to quickfix in Trail order.
+
+                                               *:WayfinderTrailNext*
+:WayfinderTrailNext
+                Open the next Trail item.
+
+                                               *:WayfinderTrailPrev*
+:WayfinderTrailPrev
+                Open the previous Trail item.
+
+                                               *:WayfinderTrailOpen*
+:WayfinderTrailOpen
+                Open the current Trail item.
+
+                                               *:WayfinderTrailShow*
+:WayfinderTrailShow
+                Open Wayfinder on the Trail facet.
+
                                                    *<Plug>(WayfinderOpen)*
 <Plug>(WayfinderOpen)
                 Mapping target to open Wayfinder.
+
+                                              *<Plug>(WayfinderTrailNext)*
+<Plug>(WayfinderTrailNext)
+                Mapping target to open the next Trail item.
+
+                                              *<Plug>(WayfinderTrailPrev)*
+<Plug>(WayfinderTrailPrev)
+                Mapping target to open the previous Trail item.
+
+                                              *<Plug>(WayfinderTrailOpen)*
+<Plug>(WayfinderTrailOpen)
+                Mapping target to open the current Trail item.
+
+                                              *<Plug>(WayfinderTrailShow)*
+<Plug>(WayfinderTrailShow)
+                Mapping target to open Wayfinder on the Trail facet.
+
+Example mappings:
+>
+  vim.keymap.set("n", "<leader>wf", "<Plug>(WayfinderOpen)", { desc = "Wayfinder" })
+  vim.keymap.set("n", "<leader>wtn", "<Plug>(WayfinderTrailNext)", { desc = "Wayfinder Trail Next" })
+  vim.keymap.set("n", "<leader>wtp", "<Plug>(WayfinderTrailPrev)", { desc = "Wayfinder Trail Prev" })
+  vim.keymap.set("n", "<leader>wto", "<Plug>(WayfinderTrailOpen)", { desc = "Wayfinder Trail Open" })
+  vim.keymap.set("n", "<leader>wts", "<Plug>(WayfinderTrailShow)", { desc = "Wayfinder Trail Show" })
+<
 
 ==============================================================================
 3. Keys                                                   *wayfinder-keys*
@@ -64,6 +114,7 @@ If no symbol is detected under the cursor, it falls back to the current file.
   t          Open in tab
   p          Pin current item into Trail
   P          Open Trail
+  x          Export current facet to quickfix
   dd         Remove current Trail item
   /          Set local filter
   d          Toggle optional details
@@ -71,7 +122,28 @@ If no symbol is detected under the cursor, it falls back to the current file.
   q          Close
 
 ==============================================================================
-4. Configuration                                        *wayfinder-config*
+4. Trail Commands                              *wayfinder-trail-commands*
+
+Trail commands work outside the Wayfinder UI.
+
+  :WayfinderTrailNext
+      Open the next valid Trail item.
+
+  :WayfinderTrailPrev
+      Open the previous valid Trail item.
+
+  :WayfinderTrailOpen
+      Open the current valid Trail item.
+
+  :WayfinderTrailShow
+      Open Wayfinder on the Trail facet.
+
+If Trail is empty, Wayfinder shows:
+
+  Wayfinder: Trail is empty
+
+==============================================================================
+5. Configuration                                        *wayfinder-config*
 
 >
   require("wayfinder").setup({
@@ -83,7 +155,7 @@ If no symbol is detected under the cursor, it falls back to the current file.
 <
 
 ==============================================================================
-5. Result Types                                  *wayfinder-result-types*
+6. Result Types                                  *wayfinder-result-types*
 
   Calls
       LSP definitions and callers for the symbol under the cursor.
@@ -98,7 +170,7 @@ If no symbol is detected under the cursor, it falls back to the current file.
       Recent commits touching the current file.
 
 ==============================================================================
-6. Demo                                                  *wayfinder-demo*
+7. Demo                                                  *wayfinder-demo*
 
 The repo includes a small fixture app and a tiny demo LSP server.
 

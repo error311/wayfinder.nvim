@@ -411,7 +411,7 @@ function M.render(session)
   sync_facet_cursor(session)
   sync_list_cursor(session)
 
-  local bottom_line = " <CR> jump   j/k move   p pin   P trail   / filter   <Tab>/<S-Tab> facets   d details   q close "
+  local bottom_line = " <CR> jump   j/k move   p pin   P trail   x export   / filter   <Tab>/<S-Tab> facets   d details   q close "
   local bottom_lines = { bottom_line }
   set_lines(state.ui.bottom_buf, bottom_lines)
   vim.api.nvim_buf_clear_namespace(state.ui.bottom_buf, -1, 0, -1)
@@ -419,7 +419,7 @@ function M.render(session)
   add_substring_highlights(
     state.ui.bottom_buf,
     bottom_line,
-    { "<CR>", "j/k", "p", "P", "/", "<Tab>", "<S-Tab>", "d", "q" },
+    { "<CR>", "j/k", "p", "P", "x", "/", "<Tab>", "<S-Tab>", "d", "q" },
     "WayfinderHeader"
   )
 

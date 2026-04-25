@@ -3,6 +3,8 @@ vim.opt.swapfile = false
 vim.notify = function() end
 
 local wayfinder = require("wayfinder")
+local state = require("wayfinder.state")
+local layout = require("wayfinder.layout")
 local trail = require("wayfinder.trail")
 local lsp_source = require("wayfinder.sources.lsp")
 local tests_source = require("wayfinder.sources.tests")
@@ -94,6 +96,73 @@ test("trail pins and removes items", function()
   assert_ok(trail.pin({ id = "one", label = "one" }), "pin should succeed")
   assert_ok(trail.has("one"), "trail should contain item")
   assert_ok(trail.remove("one"), "remove should succeed")
+end)
+
+test("trail navigation skips invalid items and wraps", function()
+  trail.clear()
+
+  local root = vim.fs.normalize(vim.fn.tempname())
+  vim.fn.mkdir(root, "p")
+  local file_a = root .. "/a.lua"
+  local file_b = root .. "/b.lua"
+  vim.fn.writefile({ "local a = true" }, file_a)
+  vim.fn.writefile({ "local b = true" }, file_b)
+
+  assert_ok(trail.pin({ id = "missing", label = "missing", path = root .. "/missing.lua", lnum = 1, col = 1 }), "pin missing")
+  assert_ok(trail.pin({ id = "a", label = "a", path = file_a, lnum = 1, col = 1 }), "pin a")
+  assert_ok(trail.pin({ id = "b", label = "b", path = file_b, lnum = 1, col = 1 }), "pin b")
+
+  wayfinder.trail_next()
+  assert_ok(vim.api.nvim_buf_get_name(0) == file_a, "trail next should wrap to first valid item")
+
+  wayfinder.trail_prev()
+  assert_ok(vim.api.nvim_buf_get_name(0) == file_b, "trail prev should wrap back to previous valid item")
+
+  wayfinder.trail_open()
+  assert_ok(vim.api.nvim_buf_get_name(0) == file_b, "trail open should reopen current trail item")
+end)
+
+test("quickfix export preserves visible order and trail order", function()
+  local root = vim.fs.normalize(vim.fn.tempname())
+  vim.fn.mkdir(root, "p")
+  local file_a = root .. "/calls.lua"
+  local file_b = root .. "/refs.lua"
+  vim.fn.writefile({ "local call_item = true" }, file_a)
+  vim.fn.writefile({ "local ref_item = true" }, file_b)
+
+  local saved_render = layout.render
+  local saved_focus = layout.focus_primary
+  layout.render = function() end
+  layout.focus_primary = function() end
+
+  state.current = {
+    facet = "refs",
+    visible_items = {
+      { id = "refs-b", label = "second", path = file_b, lnum = 1, col = 1, source = "lsp" },
+      { id = "refs-a", label = "first", path = file_a, lnum = 1, col = 1, source = "grep" },
+    },
+  }
+
+  wayfinder.export_quickfix()
+  local current_qf = vim.fn.getqflist()
+  assert_ok(#current_qf == 2, "expected exported facet quickfix entries")
+  assert_ok(vim.api.nvim_buf_get_name(current_qf[1].bufnr) == file_b, "facet export should preserve visible order")
+  assert_ok(vim.api.nvim_buf_get_name(current_qf[2].bufnr) == file_a, "facet export should preserve visible order")
+
+  trail.clear()
+  assert_ok(trail.pin({ id = "trail-a", label = "trail a", path = file_a, lnum = 1, col = 1, source = "lsp" }), "pin trail a")
+  assert_ok(trail.pin({ id = "trail-b", label = "trail b", path = file_b, lnum = 1, col = 1, source = "grep" }), "pin trail b")
+
+  state.current = nil
+  wayfinder.export_trail_quickfix()
+  local trail_qf = vim.fn.getqflist()
+  assert_ok(#trail_qf == 2, "expected exported trail quickfix entries")
+  assert_ok(vim.api.nvim_buf_get_name(trail_qf[1].bufnr) == file_a, "trail export should preserve trail order")
+  assert_ok(vim.api.nvim_buf_get_name(trail_qf[2].bufnr) == file_b, "trail export should preserve trail order")
+
+  layout.render = saved_render
+  layout.focus_primary = saved_focus
+  state.current = nil
 end)
 
 test("tests source finds likely tests", function()
@@ -237,5 +306,5 @@ if #failures > 0 then
   vim.cmd.cquit(1)
 else
   print("")
-  print("5 test(s) passed")
+  print("7 test(s) passed")
 end

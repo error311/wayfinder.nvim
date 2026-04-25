@@ -2,6 +2,7 @@ local M = {
   current = nil,
   cache = {},
   trail = {},
+  trail_cursor = 1,
   ui = {
     border = nil,
     top = nil,
