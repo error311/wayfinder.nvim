@@ -88,6 +88,18 @@ end
 
 local function refresh_visible(session)
   build_counts(session)
+
+  if session.auto_facet_pending and session.facet == "calls" then
+    if session.counts.calls == 0 and session.counts.refs > 1 then
+      session.facet = "refs"
+      session.selection_id = nil
+      session.selection_index = 1
+      session.auto_facet_pending = false
+    elseif session.counts.calls > 0 then
+      session.auto_facet_pending = false
+    end
+  end
+
   session.visible_items = filtered_items(session)
   if #session.visible_items == 0 then
     session.selection_index = 1
@@ -145,6 +157,7 @@ local function keymaps()
       map("<Right>", actions.next_facet)
       map("<Left>", actions.prev_facet)
       map("<Tab>", actions.next_facet)
+      map("<S-Tab>", actions.prev_facet)
       map("<CR>", actions.jump)
       map("s", actions.open_split)
       map("v", actions.open_vsplit)
@@ -178,6 +191,7 @@ local function create_session()
     filetype = target.filetype,
     bufnr = target.bufnr,
     facet = symbol and "calls" or "all",
+    auto_facet_pending = symbol ~= nil,
     filter = "",
     selection_index = 1,
     selection_id = nil,

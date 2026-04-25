@@ -57,6 +57,7 @@ If no symbol is detected under the cursor, it falls back to the current file.
   <C-d>      Move down by half a page
   h / l      Change facet
   <Tab>      Next facet
+  <S-Tab>    Previous facet
   <CR>       Jump
   s          Open in split
   v          Open in vsplit

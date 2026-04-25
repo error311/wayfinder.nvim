@@ -81,6 +81,7 @@ vim.keymap.set("n", "<leader>wf", "<Plug>(WayfinderOpen)", { desc = "Wayfinder" 
 - `<C-u>` / `<C-d>` move by half a page
 - `h` / `l` switch facet
 - `<Tab>` next facet
+- `<S-Tab>` previous facet
 - `<CR>` jump
 - `s` open in split
 - `v` open in vsplit

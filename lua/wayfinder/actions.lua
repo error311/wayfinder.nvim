@@ -18,12 +18,20 @@ local function page_step()
   return 5
 end
 
-local function set_selection(session, index)
+local function set_selection(session, index, opts)
   if not session or #session.visible_items == 0 then
     return
   end
 
-  session.selection_index = math.max(1, math.min(index, #session.visible_items))
+  opts = opts or {}
+  local count = #session.visible_items
+
+  if opts.wrap then
+    session.selection_index = ((index - 1) % count) + 1
+  else
+    session.selection_index = math.max(1, math.min(index, count))
+  end
+
   session.selection_id = session.visible_items[session.selection_index].id
 end
 
@@ -41,6 +49,7 @@ local function open_facet(session, facet)
     return
   end
 
+  session.auto_facet_pending = false
   session.facet = facet
   session.selection_id = nil
   session.selection_index = 1
@@ -56,7 +65,7 @@ function M.select_next()
   if not session or #session.visible_items == 0 then
     return
   end
-  set_selection(session, session.selection_index + 1)
+  set_selection(session, session.selection_index + 1, { wrap = true })
   rerender()
 end
 
@@ -65,7 +74,7 @@ function M.select_prev()
   if not session or #session.visible_items == 0 then
     return
   end
-  set_selection(session, session.selection_index - 1)
+  set_selection(session, session.selection_index - 1, { wrap = true })
   rerender()
 end
 
