@@ -137,7 +137,7 @@ function M.open()
   local facet_width = config.values.layout.facet_width
   local list_width = config.values.layout.list_width
   local header_height = 1
-  local footer_height = 1
+  local footer_height = 2
   local body_height = height - header_height - footer_height - 2
   local preview_width = width - facet_width - list_width - 6
 
@@ -411,15 +411,25 @@ function M.render(session)
   sync_facet_cursor(session)
   sync_list_cursor(session)
 
-  local bottom_line = " <CR> jump   j/k move   p pin   P trail   x export   / filter   <Tab>/<S-Tab> facets   d details   q close "
-  local bottom_lines = { bottom_line }
+  local bottom_lines = {
+    " <CR> jump   j/k move   h/l facets   <Tab>/<S-Tab> cycle   gg/G ends   <C-u>/<C-d> page ",
+    " p pin   P trail   x export   dd remove   da clear   D details   / filter   q close ",
+  }
   set_lines(state.ui.bottom_buf, bottom_lines)
   vim.api.nvim_buf_clear_namespace(state.ui.bottom_buf, -1, 0, -1)
-  vim.api.nvim_buf_add_highlight(state.ui.bottom_buf, -1, "WayfinderDim", 0, 1, -1)
+  for line = 0, #bottom_lines - 1 do
+    vim.api.nvim_buf_add_highlight(state.ui.bottom_buf, -1, "WayfinderDim", line, 1, -1)
+  end
   add_substring_highlights(
     state.ui.bottom_buf,
-    bottom_line,
-    { "<CR>", "j/k", "p", "P", "x", "/", "<Tab>", "<S-Tab>", "d", "q" },
+    bottom_lines[1],
+    { "<CR>", "j/k", "gg/G", "<C-u>/<C-d>", "h/l", "<Tab>", "<S-Tab>" },
+    "WayfinderHeader"
+  )
+  add_substring_highlights(
+    state.ui.bottom_buf,
+    bottom_lines[2],
+    { "p", "P", "x", "dd", "da", "D", "/", "q" },
     "WayfinderHeader"
   )
 

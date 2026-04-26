@@ -116,8 +116,9 @@ Example mappings:
   P          Open Trail
   x          Export current facet to quickfix
   dd         Remove current Trail item
+  da         Clear Trail
   /          Set local filter
-  d          Toggle optional details
+  D          Toggle optional details
   r          Refresh
   q          Close
 

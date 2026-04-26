@@ -270,6 +270,25 @@ function M.remove_trail_item()
   end
 end
 
+function M.clear_trail()
+  if #trail.items() == 0 then
+    export_notice(current(), "Wayfinder: Trail is empty")
+    return
+  end
+
+  trail.clear()
+
+  local session = current()
+  if session then
+    session.selection_id = nil
+    session.selection_index = 1
+    rerender()
+    export_notice(session, "Cleared Trail")
+  else
+    vim.notify("Cleared Trail", vim.log.levels.INFO)
+  end
+end
+
 function M.export_quickfix()
   local session = current()
   if not session then

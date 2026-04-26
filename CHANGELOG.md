@@ -1,5 +1,37 @@
 # Changelog
 
+## Changes 04/26/2026 (v0.1.3)
+
+`fix(v0.1.3): Trail remove keybinding conflict and Trail clear action (closes #1)`
+
+**Commit message**
+
+```text
+fix(v0.1.3): Trail remove keybinding conflict and Trail clear action (closes #1)
+
+- keys(trail): move details toggle from d to D so dd reliably removes pinned Trail items
+- keys(trail): add da to clear the full Trail from inside Wayfinder
+- ui(footer): expand the bottom keyhint strip to two lines so Trail actions are easier to discover
+```
+
+**Fixed**
+
+- **Trail remove keybinding conflict**
+  - Fixed where `dd` would trigger the single-key details toggle instead of removing the selected pinned Trail item.
+  - Details now use `D`, so `dd` works reliably for Trail removal.
+
+**Added**
+
+- **Trail clear action**
+  - Added `da` inside Wayfinder to clear the full Trail quickly.
+
+**Changed**
+
+- **Footer keyhint layout**
+  - Expanded the bottom keyhint strip to two lines so movement, Trail actions, and export controls are easier to scan.
+
+---
+
 ## Changes 04/25/2026 (v0.1.2)
 
 `release(v0.1.2): quickfix export, Trail traversal, TrailShow, and focus polish`
@@ -37,6 +69,8 @@ release(v0.1.2): quickfix export, Trail traversal, TrailShow, and focus polish
 
 - **Wayfinder focus stability**
   - Fixed a case where Wayfinder could leave input on the buffer behind the popup instead of keeping focus in the active Wayfinder pane.
+
+---
 
 ## Changes 04/24/2026 (v0.1.1)
 

@@ -109,8 +109,9 @@ vim.keymap.set("n", "<leader>wts", "<Plug>(WayfinderTrailShow)", { desc = "Wayfi
 - `P` open Trail immediately
 - `x` export current facet to quickfix
 - `dd` remove pinned trail item
+- `da` clear Trail
 - `/` filter
-- `d` toggle details
+- `D` toggle details
 - `r` refresh
 - `q` close
 - mouse wheel scrolls results
