@@ -155,6 +155,72 @@ If Trail is empty, Wayfinder shows:
   })
 <
 
+Performance presets:
+
+  fast
+      Tighter caps and shorter timeouts for large repos.
+
+  balanced
+      Default behavior for most projects.
+
+  full
+      Broader caps and looser limits.
+
+Scope modes:
+
+  project
+      Use the project root.
+
+  cwd
+      Use the current Neovim working directory.
+
+  package
+      Use the nearest package/module root based on marker files.
+
+  file_dir
+      Use the current file directory.
+
+Monorepo-friendly example:
+>
+  require("wayfinder").setup({
+    performance = "fast",
+    scope = {
+      mode = "package",
+      package_markers = {
+        "package.json",
+        "tsconfig.json",
+        "pyproject.toml",
+        "go.mod",
+        "Cargo.toml",
+        ".git",
+      },
+    },
+    limits = {
+      refs = { max_results = 200 },
+      text = { enabled = true, max_results = 100, timeout_ms = 800 },
+      tests = { max_results = 50, timeout_ms = 700 },
+      git = { enabled = true, max_commits = 15, timeout_ms = 400 },
+    },
+  })
+<
+
+The default package markers are common starting points, not required files.
+Override `scope.package_markers` if your repo uses different boundaries.
+
+Limits:
+
+  limits.refs.max_results
+      Cap semantic reference results after ordering.
+
+  limits.text.enabled / max_results / timeout_ms
+      Control grep-based Text Matches.
+
+  limits.tests.max_results / timeout_ms
+      Control likely-test discovery.
+
+  limits.git.enabled / max_commits / timeout_ms
+      Control the Git facet.
+
 ==============================================================================
 6. Result Types                                  *wayfinder-result-types*
 

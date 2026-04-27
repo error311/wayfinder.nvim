@@ -1,5 +1,41 @@
 # Changelog
 
+## Changes 04/27/2026 (v0.1.4)
+
+`release(v0.1.4): add scope and performance controls for large repos`
+
+**Commit message**
+
+```text
+release(v0.1.4): add scope and performance controls for large repos
+
+- scope(config): add project/cwd/package/file_dir scope modes plus package markers and performance presets
+- sources(limits): add per-source result caps and timeouts for refs, text matches, tests, and git
+- jumps(tagstack): push the origin window position onto the tag stack before normal Wayfinder edit jumps so <C-t> returns cleanly
+```
+
+**Added**
+
+- **Scope controls for large repos**
+  - Added `scope.mode` with `project`, `cwd`, `package`, and `file_dir` options so Wayfinder can stay focused in large repos and monorepos.
+  - Added configurable `package_markers` so `package` scope can stop at the nearest app or module root.
+
+- **Performance presets and source limits**
+  - Added `performance = "fast" | "balanced" | "full"` for quick tuning without rewriting the config.
+  - Added per-source limits and timeouts for `refs`, `text`, `tests`, and `git` so expensive sources stay responsive.
+
+- **Tag stack integration for edit jumps**
+  - Normal Wayfinder edit jumps now push the origin position onto the tag stack so `<C-t>` can return to where the jump started.
+  - This came in via PR #2. Thanks to @joshuamblanch for the contribution.
+
+**Changed**
+
+- **Scope-aware result gathering**
+  - Text matches, likely tests, and git collection now respect the active Wayfinder scope instead of always searching the full project.
+  - LSP results are post-filtered to the active scope where practical, which makes package mode behave better in monorepos.
+
+---
+
 ## Changes 04/26/2026 (v0.1.3)
 
 `fix(v0.1.3): Trail remove keybinding conflict and Trail clear action (closes #1)`

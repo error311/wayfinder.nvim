@@ -342,7 +342,8 @@ function M.render(session)
   local notice = state.notice_text()
   local mode_label = session.mode == "symbol" and "Symbol" or "File"
   local subject = session.mode == "symbol" and session.subject or vim.fs.basename(session.path)
-  local source_file = session.mode == "symbol" and paths.display(session.path, session.cwd) or nil
+  local source_file = session.mode == "symbol" and paths.display(session.path, session.project_root or session.cwd) or nil
+  local scope_label = session.scope and session.scope.mode ~= "project" and session.scope.label or nil
   local count_label = string.format("%d results", #session.visible_items)
   local loading_label = session.loading and "loading…" or nil
   local filter_label = session.filter ~= "" and ("/" .. session.filter) or nil
@@ -360,6 +361,11 @@ function M.render(session)
 
   table.insert(top_segments, { text = separator })
   table.insert(top_segments, { text = count_label, group = "WayfinderCount" })
+
+  if scope_label then
+    table.insert(top_segments, { text = separator })
+    table.insert(top_segments, { text = scope_label, group = "WayfinderDim" })
+  end
 
   if loading_label then
     table.insert(top_segments, { text = separator })

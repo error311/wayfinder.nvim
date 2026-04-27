@@ -9,6 +9,7 @@ local trail = require("wayfinder.trail")
 local lsp_source = require("wayfinder.sources.lsp")
 local tests_source = require("wayfinder.sources.tests")
 local git_source = require("wayfinder.sources.git")
+local scope_util = require("wayfinder.util.scope")
 
 wayfinder.setup()
 
@@ -90,6 +91,77 @@ local function make_git_fixture()
 end
 
 local git_fixture_root = make_git_fixture()
+
+local function make_monorepo_fixture()
+  local root = vim.fs.normalize(vim.fn.tempname())
+  local web_root = root .. "/apps/web"
+  local admin_root = root .. "/apps/admin"
+
+  vim.fn.mkdir(web_root .. "/src", "p")
+  vim.fn.mkdir(web_root .. "/tests", "p")
+  vim.fn.mkdir(admin_root .. "/src", "p")
+  vim.fn.mkdir(admin_root .. "/tests", "p")
+
+  vim.fn.writefile({ '{ "name": "wayfinder-monorepo", "private": true }' }, root .. "/package.json")
+  vim.fn.writefile({ '{ "name": "web-app" }' }, web_root .. "/package.json")
+  vim.fn.writefile({ '{ "name": "admin-app" }' }, admin_root .. "/package.json")
+
+  vim.fn.writefile({
+    "export function createUser(name) {",
+    "  return { id: name.toLowerCase(), name };",
+    "}",
+  }, web_root .. "/src/user_service.ts")
+
+  vim.fn.writefile({
+    'import { createUser } from "../src/user_service";',
+    'export const webUser = createUser("Web");',
+    'export const webUserCopy = "createUser";',
+  }, web_root .. "/src/user_page.ts")
+
+  vim.fn.writefile({
+    'import { createUser } from "../src/user_service";',
+    'describe("createUser", () => {',
+    '  it("works", () => createUser("Spec"));',
+    "})",
+  }, web_root .. "/tests/user_service_test.ts")
+
+  vim.fn.writefile({
+    'export const adminUserCopy = "createUser";',
+    'export function createUserBanner() {',
+    '  return "createUser";',
+    "}",
+  }, admin_root .. "/src/user_page.ts")
+
+  vim.fn.writefile({
+    'describe("admin createUser", () => {',
+    '  it("mentions createUser", () => expect("createUser").toBeTruthy());',
+    "})",
+  }, admin_root .. "/tests/admin_user_test.ts")
+
+  run_system({ "git", "init", "-b", "main", root })
+  run_system({ "git", "-C", root, "config", "user.name", "Wayfinder Tests" })
+  run_system({ "git", "-C", root, "config", "user.email", "wayfinder@example.com" })
+  run_system({ "git", "-C", root, "add", "." })
+  run_system({ "git", "-C", root, "commit", "-m", "fixture: monorepo" })
+
+  return {
+    root = root,
+    web_root = web_root,
+    admin_root = admin_root,
+    web_file = web_root .. "/src/user_service.ts",
+  }
+end
+
+local monorepo_fixture = make_monorepo_fixture()
+
+local function with_setup(opts, fn)
+  wayfinder.setup(opts)
+  local ok, err = pcall(fn)
+  wayfinder.setup({})
+  if not ok then
+    error(err, 0)
+  end
+end
 
 test("trail pins and removes items", function()
   trail.clear()
@@ -300,11 +372,118 @@ test("lsp source falls back to grep references without lsp", function()
   end
 end)
 
+test("package scope limits grep references to the nearest package", function()
+  with_setup({
+    scope = { mode = "package" },
+    limits = {
+      refs = { max_results = 50 },
+      text = { enabled = true, max_results = 2, timeout_ms = 800 },
+    },
+  }, function()
+    local resolved_scope = scope_util.resolve(monorepo_fixture.web_file, monorepo_fixture.root)
+    local done = false
+    local callback_err = nil
+
+    lsp_source.collect({
+      bufnr = 0,
+      path = monorepo_fixture.web_file,
+      cwd = monorepo_fixture.root,
+      project_root = monorepo_fixture.root,
+      scope_root = resolved_scope.root,
+      filetype = "typescript",
+      symbol = { text = "createUser" },
+    }, function(items)
+      local ok, err = pcall(function()
+        local grep_refs = vim.tbl_filter(function(item)
+          return item.facet == "refs" and item.source == "grep"
+        end, items)
+        assert_ok(#grep_refs == 2, "expected text-match limit to apply")
+        for _, item in ipairs(grep_refs) do
+          assert_ok(vim.startswith(item.path, monorepo_fixture.web_root .. "/"), "expected package-scoped text match")
+          assert_ok(not vim.startswith(item.path, monorepo_fixture.admin_root .. "/"), "expected admin package to be excluded")
+        end
+      end)
+      callback_err = err
+      done = true
+    end)
+
+    vim.wait(2000, function()
+      return done
+    end)
+    assert_ok(done, "package-scoped grep fallback did not finish")
+    if callback_err then
+      error(callback_err, 0)
+    end
+  end)
+end)
+
+test("tests and git sources respect package scope and source limits", function()
+  with_setup({
+    scope = { mode = "package" },
+    limits = {
+      tests = { max_results = 5, timeout_ms = 800 },
+      git = { enabled = true, max_commits = 1, timeout_ms = 400 },
+    },
+  }, function()
+    local resolved_scope = scope_util.resolve(monorepo_fixture.web_file, monorepo_fixture.root)
+
+    local tests_done = false
+    local tests_err = nil
+    tests_source.collect({
+      path = monorepo_fixture.web_file,
+      cwd = monorepo_fixture.root,
+      project_root = monorepo_fixture.root,
+      scope_root = resolved_scope.root,
+      symbol = { text = "createUser" },
+    }, function(items)
+      local ok, err = pcall(function()
+        assert_ok(#items > 0, "expected package-scoped tests")
+        for _, item in ipairs(items) do
+          assert_ok(vim.startswith(item.path, monorepo_fixture.web_root .. "/"), "expected tests to stay inside package scope")
+        end
+      end)
+      tests_err = err
+      tests_done = true
+    end)
+
+    vim.wait(2000, function()
+      return tests_done
+    end)
+    assert_ok(tests_done, "tests source did not finish")
+    if tests_err then
+      error(tests_err, 0)
+    end
+
+    local git_done = false
+    local git_err = nil
+    git_source.collect({
+      path = git_fixture_root .. "/src/user_service.ts",
+      cwd = git_fixture_root,
+      project_root = git_fixture_root,
+      scope_root = git_fixture_root,
+    }, function(items)
+      local ok, err = pcall(function()
+        assert_ok(#items == 1, "expected git commit limit to apply")
+      end)
+      git_err = err
+      git_done = true
+    end)
+
+    vim.wait(2000, function()
+      return git_done
+    end)
+    assert_ok(git_done, "git source did not finish")
+    if git_err then
+      error(git_err, 0)
+    end
+  end)
+end)
+
 if #failures > 0 then
   print("")
   print(string.format("%d test(s) failed", #failures))
   vim.cmd.cquit(1)
 else
   print("")
-  print("7 test(s) passed")
+  print("9 test(s) passed")
 end

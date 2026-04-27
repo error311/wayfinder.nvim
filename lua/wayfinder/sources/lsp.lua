@@ -2,6 +2,7 @@ local async = require("wayfinder.util.async")
 local config = require("wayfinder.config")
 local items = require("wayfinder.util.items")
 local paths = require("wayfinder.util.paths")
+local scope = require("wayfinder.util.scope")
 local text = require("wayfinder.util.text")
 
 local M = {}
@@ -27,6 +28,24 @@ local function dedupe(found)
     end
   end
 
+  return out
+end
+
+local function sorted(found)
+  local out = dedupe(found)
+  table.sort(out, items.score_sort)
+  return out
+end
+
+local function take(found, max_results)
+  if not max_results or max_results < 1 or #found <= max_results then
+    return found
+  end
+
+  local out = {}
+  for index = 1, max_results do
+    out[index] = found[index]
+  end
   return out
 end
 
@@ -68,8 +87,8 @@ local function location_items(facet, kind, badge, score, result, ctx)
             source = "lsp",
             score = score,
             badge = badge,
-            detail = paths.display(path, ctx.cwd),
-            secondary = paths.display(path, ctx.cwd),
+            detail = paths.display(path, ctx.project_root),
+            secondary = paths.display(path, ctx.project_root),
             group = facet == "calls" and (kind == "definition" and "Definitions" or "Callers") or "LSP References",
             icon = facet == "calls"
               and (kind == "definition" and config.values.icons.definition or config.values.icons.caller)
@@ -83,8 +102,13 @@ local function location_items(facet, kind, badge, score, result, ctx)
   return out
 end
 
+local function post_filter(found, ctx)
+  return scope.filter(found, ctx.scope_root)
+end
+
 local function grep_references(ctx, callback)
-  if not ctx.symbol or ctx.symbol.text == "" or vim.fn.executable("rg") ~= 1 then
+  local text_limits = config.values.limits.text
+  if not text_limits.enabled or not ctx.symbol or ctx.symbol.text == "" or vim.fn.executable("rg") ~= 1 then
     callback({})
     return
   end
@@ -95,7 +119,8 @@ local function grep_references(ctx, callback)
     current_line = vim.api.nvim_win_get_cursor(winid)[1]
   end
 
-  vim.system({
+  local base = ctx.scope_root or ctx.project_root or ctx.cwd
+  local cmd = {
     "rg",
     "--line-number",
     "--column",
@@ -104,51 +129,145 @@ local function grep_references(ctx, callback)
     "--word-regexp",
     ctx.symbol.text,
     ".",
-  }, { cwd = ctx.cwd }, function(result)
-    vim.schedule(function()
-      if result.code ~= 0 and (result.stdout == nil or result.stdout == "") then
+  }
+
+  local finished = false
+  local collected = {}
+  local pending = ""
+  local job_id = nil
+  local timer = nil
+
+  local function finish()
+    if finished then
+      return
+    end
+
+    finished = true
+    if timer then
+      timer:stop()
+      timer:close()
+      timer = nil
+    end
+    if job_id and job_id > 0 then
+      pcall(vim.fn.jobstop, job_id)
+    end
+
+    callback(take(sorted(post_filter(collected, ctx)), text_limits.max_results))
+  end
+
+  local function push_line(line)
+    if line == "" or #collected >= text_limits.max_results then
+      return
+    end
+
+    local relative, row, col = line:match("^([^:]+):(%d+):(%d+):")
+    if not relative or not row or not col then
+      return
+    end
+
+    local path = paths.normalize(base .. "/" .. relative)
+    local lnum = tonumber(row)
+    local cnum = tonumber(col)
+    if not path or not lnum or not cnum or (path == ctx.path and current_line and lnum == current_line) then
+      return
+    end
+
+    local label = text.line_at(path, lnum)
+    if label == "" then
+      return
+    end
+
+    collected[#collected + 1] = {
+      id = items.item_id({ "grep-reference", path, lnum, cnum }),
+      facet = "refs",
+      kind = "reference",
+      label = label,
+      path = path,
+      lnum = lnum,
+      col = cnum,
+      preview_range = {
+        start = lnum,
+        ["end"] = math.max(lnum + 2, lnum),
+      },
+      source = "grep",
+      score = 70,
+      badge = "TXT",
+      detail = paths.display(path, ctx.project_root),
+      secondary = paths.display(path, ctx.project_root),
+      group = "Text Matches",
+      icon = config.values.icons.refs,
+    }
+  end
+
+  job_id = vim.fn.jobstart(cmd, {
+    cwd = base,
+    stdout_buffered = false,
+    stderr_buffered = true,
+    on_stdout = function(_, data)
+      if finished or not data then
+        return
+      end
+
+      local lines = vim.deepcopy(data)
+      if #lines == 0 then
+        return
+      end
+
+      lines[1] = pending .. (lines[1] or "")
+      pending = table.remove(lines) or ""
+
+      for _, line in ipairs(lines) do
+        push_line(line)
+        if #collected >= text_limits.max_results then
+          finish()
+          return
+        end
+      end
+    end,
+    on_exit = function(_, code)
+      if finished then
+        return
+      end
+
+      if pending ~= "" then
+        push_line(pending)
+        pending = ""
+      end
+
+      if code ~= 0 and #collected == 0 then
         callback({})
         return
       end
 
-      local out = {}
-      for _, line in ipairs(vim.split(result.stdout or "", "\n", { trimempty = true })) do
-        local relative, row, col = line:match("^([^:]+):(%d+):(%d+):")
-        if relative and row and col then
-          local path = paths.normalize(ctx.cwd .. "/" .. relative)
-          local lnum = tonumber(row)
-          local cnum = tonumber(col)
-          if path and lnum and cnum and not (path == ctx.path and current_line and lnum == current_line) then
-            local label = text.line_at(path, lnum)
-            if label ~= "" then
-              out[#out + 1] = {
-                id = items.item_id({ "grep-reference", path, lnum, cnum }),
-                facet = "refs",
-                kind = "reference",
-                label = label,
-                path = path,
-                lnum = lnum,
-                col = cnum,
-                preview_range = {
-                  start = lnum,
-                  ["end"] = math.max(lnum + 2, lnum),
-                },
-                source = "grep",
-                score = 70,
-                badge = "REF",
-                detail = paths.display(path, ctx.cwd),
-                secondary = paths.display(path, ctx.cwd),
-                group = "Text Matches",
-                icon = config.values.icons.refs,
-              }
-            end
-          end
-        end
-      end
+      finish()
+    end,
+  })
 
-      callback(dedupe(out))
+  if job_id <= 0 then
+    callback({})
+    return
+  end
+
+  if text_limits.timeout_ms and text_limits.timeout_ms > 0 then
+    timer = vim.uv.new_timer()
+    timer:start(text_limits.timeout_ms, 0, function()
+      vim.schedule(function()
+        if finished then
+          return
+        end
+        finished = true
+        if timer then
+          timer:stop()
+          timer:close()
+          timer = nil
+        end
+        if job_id and job_id > 0 then
+          pcall(vim.fn.jobstop, job_id)
+        end
+        callback(take(sorted(post_filter(collected, ctx)), text_limits.max_results))
+      end)
     end)
-  end)
+  end
 end
 
 local function flatten_responses(mapper, responses, ctx)
@@ -191,18 +310,19 @@ local function gather_references(ctx, push)
     params.context = { includeDeclaration = include_declaration }
 
     request_all(ctx.bufnr, "textDocument/references", params, function(responses)
-      done(flatten_responses(function(result, c)
+      done(post_filter(flatten_responses(function(result, c)
         return location_items("refs", "reference", "REF", 90, result, c)
-      end, responses, ctx))
+      end, responses, ctx), ctx))
     end)
   end
 
   collect(false, function(found)
     collect(true, function(retried)
       grep_references(ctx, function(grep_found)
-        local merged = dedupe(vim.list_extend(vim.list_extend({}, found), retried))
+        local refs_limit = config.values.limits.refs.max_results
+        local merged = take(sorted(vim.list_extend(vim.list_extend({}, found), retried)), refs_limit)
         if #merged > 0 then
-          push(dedupe(vim.list_extend(merged, grep_found)))
+          push(sorted(vim.list_extend(merged, grep_found)))
           return
         end
 
@@ -267,9 +387,7 @@ function M.collect(ctx, callback)
     end
     pending = pending - 1
     if pending == 0 then
-      local merged = dedupe(results)
-      table.sort(merged, items.score_sort)
-      callback(merged)
+      callback(sorted(results))
     end
   end
 

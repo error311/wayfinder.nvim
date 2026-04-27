@@ -48,7 +48,21 @@ With `lazy.nvim`:
 }
 ```
 
-## Setup
+## Quick Start
+
+Wayfinder works with the default setup:
+
+```lua
+require("wayfinder").setup({})
+vim.keymap.set("n", "<leader>wf", "<Plug>(WayfinderOpen)", { desc = "Wayfinder" })
+```
+
+Open it on a symbol for definitions, references, callers, likely tests, and recent commits.
+If there is no symbol under the cursor, it falls back to the current file.
+
+## Optional Setup
+
+If you want to tune the layout, keep it small:
 
 ```lua
 require("wayfinder").setup({
@@ -59,7 +73,64 @@ require("wayfinder").setup({
 })
 ```
 
-## Command
+## Large Repos and Monorepos
+
+You do not need to set any scope or performance options for normal repos.
+
+If you work in a large repo or monorepo, Wayfinder can narrow broad sources like
+text matches, likely tests, and git history.
+
+Mental model:
+
+- `project`: search the whole project, usually the git root
+- `package`: search the nearest app/package/module root
+- `cwd`: search from the current Neovim working directory
+- `file_dir`: search from the current file directory
+
+Common monorepo setup:
+
+```lua
+require("wayfinder").setup({
+  performance = "fast",
+  scope = {
+    mode = "package",
+    package_markers = {
+      "package.json",
+      "tsconfig.json",
+      "pyproject.toml",
+      "go.mod",
+      "Cargo.toml",
+      ".git",
+    },
+  },
+  limits = {
+    refs = { max_results = 200 },
+    text = { enabled = true, max_results = 100, timeout_ms = 800 },
+    tests = { max_results = 50, timeout_ms = 700 },
+    git = { enabled = true, max_commits = 15, timeout_ms = 400 },
+  },
+})
+```
+
+Those `package_markers` are just common defaults. They are not required files, and you can override them if your repo uses different boundaries.
+
+`performance` presets:
+
+- `fast`: tighter limits and shorter timeouts
+- `balanced`: default behavior
+- `full`: broader limits and looser timeouts
+
+## Recommended Mappings
+
+```lua
+vim.keymap.set("n", "<leader>wf", "<Plug>(WayfinderOpen)", { desc = "Wayfinder" })
+vim.keymap.set("n", "<leader>wtn", "<Plug>(WayfinderTrailNext)", { desc = "Wayfinder Trail Next" })
+vim.keymap.set("n", "<leader>wtp", "<Plug>(WayfinderTrailPrev)", { desc = "Wayfinder Trail Prev" })
+vim.keymap.set("n", "<leader>wto", "<Plug>(WayfinderTrailOpen)", { desc = "Wayfinder Trail Open" })
+vim.keymap.set("n", "<leader>wts", "<Plug>(WayfinderTrailShow)", { desc = "Wayfinder Trail Show" })
+```
+
+## Commands
 
 - `:Wayfinder`
 - `:WayfinderExportQuickfix`
@@ -73,24 +144,6 @@ require("wayfinder").setup({
 - `<Plug>(WayfinderTrailPrev)`
 - `<Plug>(WayfinderTrailOpen)`
 - `<Plug>(WayfinderTrailShow)`
-
-Open it on a symbol for definitions, references, callers, likely tests, and recent commits.
-If there is no symbol under the cursor, it falls back to the current file.
-
-Recommended mapping:
-
-```lua
-vim.keymap.set("n", "<leader>wf", "<Plug>(WayfinderOpen)", { desc = "Wayfinder" })
-```
-
-Recommended Trail mappings:
-
-```lua
-vim.keymap.set("n", "<leader>wtn", "<Plug>(WayfinderTrailNext)", { desc = "Wayfinder Trail Next" })
-vim.keymap.set("n", "<leader>wtp", "<Plug>(WayfinderTrailPrev)", { desc = "Wayfinder Trail Prev" })
-vim.keymap.set("n", "<leader>wto", "<Plug>(WayfinderTrailOpen)", { desc = "Wayfinder Trail Open" })
-vim.keymap.set("n", "<leader>wts", "<Plug>(WayfinderTrailShow)", { desc = "Wayfinder Trail Show" })
-```
 
 ## Default Keys
 
@@ -140,6 +193,21 @@ Quickfix export:
 - `Refs` is split into `LSP References` and `Text Matches`
 - `Tests` is heuristic and intentionally ranked below calls and refs
 - `Git` shows recent commits touching the current file
+
+## Scope and Performance
+
+- `scope.mode` controls how far Wayfinder searches:
+  - `project` uses the project root
+  - `cwd` uses the current Neovim working directory
+  - `package` uses the nearest package/module marker
+  - `file_dir` uses the current file directory
+- `limits` can cap expensive sources without changing the UI model:
+  - `refs.max_results`
+  - `text.enabled`, `text.max_results`, `text.timeout_ms`
+  - `tests.max_results`, `tests.timeout_ms`
+  - `git.enabled`, `git.max_commits`, `git.timeout_ms`
+
+With package scope enabled, Wayfinder keeps text matches, likely tests, and other broad searches inside the nearest app or module instead of spilling across the full repo.
 
 ## Demo Fixture
 

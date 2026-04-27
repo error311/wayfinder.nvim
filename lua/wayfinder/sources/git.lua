@@ -7,7 +7,10 @@ local M = {}
 local config = require("wayfinder.config")
 
 local function resolve_repo(ctx, callback)
-  async.system({ "git", "rev-parse", "--show-toplevel" }, { cwd = ctx.cwd }, function(result)
+  async.system({ "git", "rev-parse", "--show-toplevel" }, {
+    cwd = ctx.scope_root or ctx.project_root or ctx.cwd,
+    timeout_ms = config.values.limits.git.timeout_ms,
+  }, function(result)
     if result.code ~= 0 then
       callback(nil, nil)
       return
@@ -24,7 +27,8 @@ local function resolve_repo(ctx, callback)
 end
 
 function M.collect(ctx, callback)
-  if not ctx.path then
+  local git_limits = config.values.limits.git
+  if not git_limits.enabled or not ctx.path then
     callback({})
     return
   end
@@ -38,11 +42,13 @@ function M.collect(ctx, callback)
     async.system({
       "git",
       "log",
+      "-n",
+      tostring(git_limits.max_commits),
       "--pretty=format:%h%x09%s%x09%cr",
       "--",
       relative,
-    }, { cwd = repo_root }, function(result)
-      if result.code ~= 0 then
+    }, { cwd = repo_root, timeout_ms = git_limits.timeout_ms }, function(result)
+      if result.timed_out or result.code ~= 0 then
         callback({})
         return
       end
@@ -50,9 +56,6 @@ function M.collect(ctx, callback)
       local output = vim.split(result.stdout or "", "\n", { trimempty = true })
       local rows = {}
       for index, line in ipairs(output) do
-        if index > config.values.git_commit_limit then
-          break
-        end
         local hash, subject, when = line:match("^([^\t]+)\t([^\t]+)\t(.+)$")
         if hash and subject then
           table.insert(rows, {
@@ -68,7 +71,7 @@ function M.collect(ctx, callback)
             score = 2 - index,
             badge = "GIT",
             detail = hash .. " • " .. when,
-            secondary = paths.display(ctx.path, ctx.cwd),
+            secondary = paths.display(ctx.path, ctx.project_root),
             group = "Recent Commits",
             icon = config.values.icons.git,
             git = {

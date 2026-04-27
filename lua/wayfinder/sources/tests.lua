@@ -7,11 +7,17 @@ local text = require("wayfinder.util.text")
 local M = {}
 
 local function file_candidates(ctx, done)
-  async.system({ "git", "ls-files" }, { cwd = ctx.cwd }, function(result)
-    if result.code == 0 then
+  local root = ctx.scope_root or ctx.project_root or ctx.cwd
+  local test_limits = config.values.limits.tests
+
+  async.system({ "git", "ls-files", "--", "." }, {
+    cwd = root,
+    timeout_ms = test_limits.timeout_ms,
+  }, function(result)
+    if result.code == 0 and not result.timed_out then
       local lines = vim.split(result.stdout or "", "\n", { trimempty = true })
       done(vim.tbl_map(function(path)
-        return paths.normalize(ctx.cwd .. "/" .. path)
+        return paths.normalize(root .. "/" .. path)
       end, lines))
       return
     end
@@ -19,9 +25,9 @@ local function file_candidates(ctx, done)
     done(vim.fs.find(function(name)
       return name:match("%.lua$") or name:match("%.ts$") or name:match("%.tsx$") or name:match("%.js$")
     end, {
-      path = ctx.cwd,
+      path = root,
       type = "file",
-      limit = 300,
+      limit = math.max(test_limits.max_results * 12, 300),
     }))
   end)
 end
@@ -51,6 +57,7 @@ end
 function M.collect(ctx, callback)
   file_candidates(ctx, function(candidates)
     local results = {}
+    local limit = config.values.limits.tests.max_results
 
     for _, path in ipairs(candidates) do
       if path ~= ctx.path then
@@ -68,8 +75,8 @@ function M.collect(ctx, callback)
             source = "test",
             score = 10 + math.floor(score_value / 2),
             badge = "TEST",
-            detail = paths.display(path, ctx.cwd),
-            secondary = paths.display(path, ctx.cwd),
+            detail = paths.display(path, ctx.project_root),
+            secondary = paths.display(path, ctx.project_root),
             group = "Likely Tests",
             icon = config.values.icons.tests,
           })
@@ -78,6 +85,15 @@ function M.collect(ctx, callback)
     end
 
     table.sort(results, items.score_sort)
+    if #results > limit then
+      local limited = {}
+      for index = 1, limit do
+        limited[index] = results[index]
+      end
+      callback(limited)
+      return
+    end
+
     callback(results)
   end)
 end

@@ -7,6 +7,7 @@ local trail = require("wayfinder.trail")
 local symbol_util = require("wayfinder.util.symbol")
 local items = require("wayfinder.util.items")
 local paths = require("wayfinder.util.paths")
+local scope = require("wayfinder.util.scope")
 local sources = {
   lsp = require("wayfinder.sources.lsp"),
   tests = require("wayfinder.sources.tests"),
@@ -20,17 +21,25 @@ local function source_key(target, symbol)
     target.path or "",
     target.filetype or "",
     symbol and symbol.text or "",
+    target.scope and target.scope.mode or "",
+    target.scope and target.scope.root or "",
   }, "|")
 end
 
 local function target_context()
   local bufnr = vim.api.nvim_get_current_buf()
   local path = vim.api.nvim_buf_get_name(bufnr)
+  local cwd = vim.uv.cwd()
+  local normalized_path = path ~= "" and vim.fs.normalize(path) or nil
+  local resolved_scope = scope.resolve(normalized_path, cwd)
+
   return {
     bufnr = bufnr,
-    path = path ~= "" and vim.fs.normalize(path) or nil,
+    path = normalized_path,
     filetype = vim.bo[bufnr].filetype,
-    cwd = paths.project_root(path, vim.uv.cwd()),
+    cwd = cwd,
+    project_root = resolved_scope.project_root,
+    scope = resolved_scope,
   }
 end
 
@@ -64,7 +73,7 @@ local function filtered_items(session)
     all_items = trail.items()
     for index, item in ipairs(all_items) do
       local previous = all_items[index - 1]
-      local destination = string.format("%s:%d", paths.display(item.path, session.cwd), item.lnum or 1)
+      local destination = string.format("%s:%d", paths.display(item.path, session.project_root), item.lnum or 1)
 
       item.icon = index == 1 and config.values.icons.trail or "↳"
       item.group = "Pinned Trail"
@@ -190,6 +199,8 @@ local function create_session()
     symbol = symbol,
     path = target.path,
     cwd = target.cwd,
+    project_root = target.project_root,
+    scope = target.scope,
     filetype = target.filetype,
     bufnr = target.bufnr,
     facet = symbol and "calls" or "all",
@@ -257,6 +268,9 @@ local function load_source(session, target, symbol, source_name)
     bufnr = target.bufnr,
     path = target.path,
     cwd = target.cwd,
+    project_root = target.project_root,
+    scope = target.scope,
+    scope_root = target.scope and target.scope.root or nil,
     filetype = target.filetype,
     symbol = symbol,
   }, function(found)
