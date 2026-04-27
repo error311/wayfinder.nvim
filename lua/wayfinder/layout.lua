@@ -10,6 +10,8 @@ local M = {}
 
 local core_windows = { "border", "top", "facet", "list", "preview", "bottom" }
 local core_buffers = { "top_buf", "facet_buf", "list_buf", "preview_buf", "bottom_buf" }
+local close_group = vim.api.nvim_create_augroup("WayfinderClose", { clear = true })
+local closing = false
 
 local function interactive_windows()
   return {
@@ -39,6 +41,25 @@ local function create_buf(name)
   return bufnr
 end
 
+local function close_on_quit(bufnr)
+  vim.api.nvim_create_autocmd("BufWinLeave", {
+    group = close_group,
+    buffer = bufnr,
+    once = true,
+    callback = function()
+      if closing or not state.current then
+        return
+      end
+
+      vim.schedule(function()
+        if not closing and state.current then
+          require("wayfinder.actions").close()
+        end
+      end)
+    end,
+  })
+end
+
 local function set_lines(bufnr, lines)
   if not bufnr or not vim.api.nvim_buf_is_valid(bufnr) then
     return
@@ -60,6 +81,7 @@ local function add_substring_highlights(bufnr, line, ranges, group)
 end
 
 local function clear_ui()
+  closing = true
   for _, key in ipairs({ "border", "top", "facet", "facet_divider", "list", "list_divider", "preview", "bottom" }) do
     local winid = state.ui[key]
     if winid and vim.api.nvim_win_is_valid(winid) then
@@ -71,6 +93,7 @@ local function clear_ui()
   for _, key in ipairs({ "top_buf", "facet_buf", "list_buf", "preview_buf", "bottom_buf", "preview_header" }) do
     state.ui[key] = nil
   end
+  closing = false
 end
 
 local function ui_valid()
@@ -174,6 +197,7 @@ function M.open()
   })
 
   local facet_buf = create_buf("wayfinder://facets")
+  close_on_quit(facet_buf)
   state.ui.facet_buf = facet_buf
   state.ui.facet = create_window(facet_buf, {
     relative = "editor",
@@ -188,6 +212,7 @@ function M.open()
   })
 
   local list_buf = create_buf("wayfinder://list")
+  close_on_quit(list_buf)
   state.ui.list_buf = list_buf
   state.ui.list = create_window(list_buf, {
     relative = "editor",
@@ -222,6 +247,7 @@ function M.open()
   vim.wo[state.ui.facet_divider].winhighlight = "Normal:WayfinderDim"
 
   local preview_buf = create_buf("wayfinder://preview")
+  close_on_quit(preview_buf)
   state.ui.preview_buf = preview_buf
   state.ui.preview = create_window(preview_buf, {
     relative = "editor",
