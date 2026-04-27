@@ -213,6 +213,17 @@ function M.click_jump()
   M.jump()
 end
 
+local function push_tagstack(win, tagname)
+  if not win or not vim.api.nvim_win_is_valid(win) then
+    return
+  end
+  local bufnr = vim.api.nvim_win_get_buf(win)
+  local cursor = vim.api.nvim_win_get_cursor(win)
+  local from = { bufnr, cursor[1], cursor[2] + 1, 0 }
+  local items = { { tagname = tagname ~= "" and tagname or "wayfinder", from = from } }
+  pcall(vim.fn.settagstack, win, { items = items }, "t")
+end
+
 local function open_item(item, opener)
   local session = current()
   if not session or not item or not item.path then
@@ -220,6 +231,11 @@ local function open_item(item, opener)
   end
 
   local target_win = session.origin_win
+  local tagname = (session.symbol and session.symbol.text) or session.subject or ""
+  if opener == "edit" or opener == nil then
+    push_tagstack(target_win, tagname)
+  end
+
   layout.close()
   state.current = nil
   if target_win and vim.api.nvim_win_is_valid(target_win) then
