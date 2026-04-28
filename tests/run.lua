@@ -13,6 +13,8 @@ local scope_util = require("wayfinder.util.scope")
 
 wayfinder.setup()
 
+-- Harness -------------------------------------------------------------------
+
 local failures = {}
 
 local function test(name, fn)
@@ -31,6 +33,38 @@ local function assert_ok(value, message)
     error(message or "assertion failed", 0)
   end
 end
+
+local function await(predicate, timeout_ms, message)
+  local finished = vim.wait(timeout_ms or 2000, predicate)
+  assert_ok(finished, message or "timed out waiting for async work")
+end
+
+local function await_callback(start, validate, opts)
+  opts = opts or {}
+
+  local done = false
+  local callback_err = nil
+  local result
+
+  local handle = start(function(items)
+    result = items
+    local _, err = pcall(validate, items)
+    callback_err = err
+    done = true
+  end)
+
+  await(function()
+    return done
+  end, opts.timeout_ms, opts.message)
+
+  if callback_err then
+    error(callback_err, 0)
+  end
+
+  return result, handle
+end
+
+-- Fixtures ------------------------------------------------------------------
 
 local fixture_root = vim.fs.normalize(vim.fn.getcwd() .. "/demo/fixture-app")
 
@@ -81,7 +115,7 @@ local function make_git_fixture()
     "}",
     "",
     'export const USER_ACTION = "createUser";',
-    'export const USER_COPY = "createUser helps bootstrap demos.";'
+    'export const USER_COPY = "createUser helps bootstrap demos.";',
   }, root .. "/src/user_service.ts")
 
   run_system({ "git", "-C", root, "add", "src/user_service.ts" })
@@ -154,6 +188,8 @@ end
 
 local monorepo_fixture = make_monorepo_fixture()
 
+-- Shared helpers -------------------------------------------------------------
+
 local function with_setup(opts, fn)
   wayfinder.setup(opts)
   local ok, err = pcall(fn)
@@ -163,7 +199,42 @@ local function with_setup(opts, fn)
   end
 end
 
+local function open_typescript(path)
+  vim.cmd.edit(path)
+  local bufnr = vim.api.nvim_get_current_buf()
+  vim.bo[bufnr].filetype = "typescript"
+  return bufnr
+end
+
+local function stop_lsp_clients(bufnr)
+  for _, client in ipairs(vim.lsp.get_clients({ bufnr = bufnr })) do
+    client:stop()
+  end
+end
+
+local function start_demo_lsp(bufnr, root, opts)
+  opts = opts or {}
+  stop_lsp_clients(bufnr)
+
+  vim.lsp.start({
+    name = opts.name or "wayfinder-demo-lsp",
+    cmd = { "python3", vim.fs.normalize(vim.fn.getcwd() .. "/demo/fake_lsp.py") },
+    cmd_env = opts.cmd_env,
+    root_dir = root,
+  }, {
+    bufnr = bufnr,
+  })
+
+  local attached = vim.wait(2000, function()
+    return #vim.lsp.get_clients({ bufnr = bufnr }) > 0
+  end)
+  assert_ok(attached, "demo lsp did not attach")
+end
+
+-- Tests ---------------------------------------------------------------------
+
 test("trail pins and removes items", function()
+  -- Guards the basic Trail pin/remove state so later workflow changes do not break it.
   trail.clear()
   assert_ok(trail.pin({ id = "one", label = "one" }), "pin should succeed")
   assert_ok(trail.has("one"), "trail should contain item")
@@ -171,6 +242,7 @@ test("trail pins and removes items", function()
 end)
 
 test("trail navigation skips invalid items and wraps", function()
+  -- Guards external Trail navigation when entries are missing on disk and when cursor movement wraps.
   trail.clear()
 
   local root = vim.fs.normalize(vim.fn.tempname())
@@ -195,6 +267,7 @@ test("trail navigation skips invalid items and wraps", function()
 end)
 
 test("quickfix export preserves visible order and trail order", function()
+  -- Guards quickfix export ordering for both the active facet and Trail.
   local root = vim.fs.normalize(vim.fn.tempname())
   vim.fn.mkdir(root, "p")
   local file_a = root .. "/calls.lua"
@@ -238,141 +311,154 @@ test("quickfix export preserves visible order and trail order", function()
 end)
 
 test("tests source finds likely tests", function()
-  local done = false
-  local callback_err = nil
-  tests_source.collect({
-    path = git_fixture_root .. "/src/user_service.ts",
-    cwd = git_fixture_root,
-    symbol = { text = "createUser" },
-  }, function(items)
-    local ok, err = pcall(function()
-      assert_ok(#items > 0, "expected likely tests")
-    end)
-    callback_err = err
-    done = true
-  end)
-  vim.wait(2000, function()
-    return done
-  end)
-  assert_ok(done, "tests source did not finish")
-  if callback_err then
-    error(callback_err, 0)
-  end
+  -- Guards the heuristic test source so it keeps returning useful candidates.
+  await_callback(function(done)
+    return tests_source.collect({
+      path = git_fixture_root .. "/src/user_service.ts",
+      cwd = git_fixture_root,
+      symbol = { text = "createUser" },
+    }, done)
+  end, function(items)
+    assert_ok(#items > 0, "expected likely tests")
+  end, {
+    message = "tests source did not finish",
+  })
 end)
 
 test("git source returns commits", function()
-  local done = false
-  local callback_err = nil
-  git_source.collect({
-    path = git_fixture_root .. "/src/user_service.ts",
-    cwd = git_fixture_root,
-  }, function(items)
-    local ok, err = pcall(function()
-      assert_ok(#items > 0, "expected git commits")
-      assert_ok(items[1].git and items[1].git.repo_root, "expected git repo metadata")
-    end)
-    callback_err = err
-    done = true
-  end)
-  vim.wait(2000, function()
-    return done
-  end)
-  assert_ok(done, "git source did not finish")
-  if callback_err then
-    error(callback_err, 0)
-  end
+  -- Guards the git facet so commit rows and repo metadata continue to populate.
+  await_callback(function(done)
+    return git_source.collect({
+      path = git_fixture_root .. "/src/user_service.ts",
+      cwd = git_fixture_root,
+    }, done)
+  end, function(items)
+    assert_ok(#items > 0, "expected git commits")
+    assert_ok(items[1].git and items[1].git.repo_root, "expected git repo metadata")
+  end, {
+    message = "git source did not finish",
+  })
 end)
 
 test("lsp source returns definitions references and callers", function()
-  vim.cmd.edit(fixture_root .. "/src/user_service.ts")
-  local bufnr = vim.api.nvim_get_current_buf()
-  vim.bo[bufnr].filetype = "typescript"
-
-  vim.lsp.start({
-    name = "wayfinder-demo-lsp",
-    cmd = { "python3", vim.fs.normalize(vim.fn.getcwd() .. "/demo/fake_lsp.py") },
-    root_dir = fixture_root,
-  }, {
-    bufnr = bufnr,
-  })
-
-  local attached = vim.wait(2000, function()
-    return #vim.lsp.get_clients({ bufnr = bufnr }) > 0
-  end)
-  assert_ok(attached, "demo lsp did not attach")
-
+  -- Guards the happy-path LSP flow across Calls and Refs.
+  local bufnr = open_typescript(fixture_root .. "/src/user_service.ts")
+  start_demo_lsp(bufnr, fixture_root)
   vim.api.nvim_win_set_cursor(0, { 1, 18 })
 
-  local done = false
-  local callback_err = nil
-  lsp_source.collect({
-    bufnr = bufnr,
-    path = fixture_root .. "/src/user_service.ts",
-    cwd = fixture_root,
-    filetype = "typescript",
-    symbol = { text = "createUser" },
-  }, function(items)
-    local ok, err = pcall(function()
-      local facets = {}
-      for _, item in ipairs(items) do
-        facets[item.facet] = true
-      end
-      assert_ok(#items >= 4, "expected lsp results")
-      assert_ok(facets.calls, "expected calls facet results")
-      assert_ok(facets.refs, "expected refs facet results")
-    end)
-    callback_err = err
-    done = true
-  end)
-
-  vim.wait(2000, function()
-    return done
-  end)
-  assert_ok(done, "lsp source did not finish")
-  if callback_err then
-    error(callback_err, 0)
-  end
+  await_callback(function(done)
+    return lsp_source.collect({
+      bufnr = bufnr,
+      path = fixture_root .. "/src/user_service.ts",
+      cwd = fixture_root,
+      filetype = "typescript",
+      symbol = { text = "createUser" },
+    }, done)
+  end, function(items)
+    local facets = {}
+    for _, item in ipairs(items) do
+      facets[item.facet] = true
+    end
+    assert_ok(#items >= 4, "expected lsp results")
+    assert_ok(facets.calls, "expected calls facet results")
+    assert_ok(facets.refs, "expected refs facet results")
+  end, {
+    message = "lsp source did not finish",
+  })
 end)
 
 test("lsp source falls back to grep references without lsp", function()
-  vim.cmd.edit(fixture_root .. "/src/user_service.ts")
-  local bufnr = vim.api.nvim_get_current_buf()
-  vim.bo[bufnr].filetype = "typescript"
-  for _, client in ipairs(vim.lsp.get_clients({ bufnr = bufnr })) do
-    client:stop()
-  end
+  -- Guards text-match fallback when no LSP client is attached.
+  local bufnr = open_typescript(fixture_root .. "/src/user_service.ts")
+  stop_lsp_clients(bufnr)
+  vim.api.nvim_win_set_cursor(0, { 1, 18 })
+
+  await_callback(function(done)
+    return lsp_source.collect({
+      bufnr = bufnr,
+      path = fixture_root .. "/src/user_service.ts",
+      cwd = fixture_root,
+      filetype = "typescript",
+      symbol = { text = "createUser" },
+    }, done)
+  end, function(items)
+    local grep_refs = vim.tbl_filter(function(item)
+      return item.facet == "refs" and item.source == "grep"
+    end, items)
+    assert_ok(#grep_refs > 0, "expected grep fallback references")
+  end, {
+    message = "grep fallback did not finish",
+  })
+end)
+
+test("lsp source cancel ignores stale responses", function()
+  -- Guards stale-request cancellation so closed or replaced sessions do not get late LSP mutations.
+  local bufnr = open_typescript(fixture_root .. "/src/user_service.ts")
+  start_demo_lsp(bufnr, fixture_root, {
+    name = "wayfinder-demo-lsp-delayed-cancel",
+    cmd_env = { WAYFINDER_LSP_DELAY_MS = "200" },
+  })
 
   vim.api.nvim_win_set_cursor(0, { 1, 18 })
 
-  local done = false
-  local callback_err = nil
-  lsp_source.collect({
+  local called = false
+  local handle = lsp_source.collect({
     bufnr = bufnr,
     path = fixture_root .. "/src/user_service.ts",
     cwd = fixture_root,
+    project_root = fixture_root,
     filetype = "typescript",
     symbol = { text = "createUser" },
-  }, function(items)
-    local ok, err = pcall(function()
-      local grep_refs = vim.tbl_filter(function(item)
-        return item.facet == "refs" and item.source == "grep"
-      end, items)
-      assert_ok(#grep_refs > 0, "expected grep fallback references")
-    end)
-    callback_err = err
-    done = true
+  }, function()
+    called = true
   end)
 
-  vim.wait(2000, function()
-    return done
+  assert_ok(handle and handle.cancel, "expected cancel handle")
+  handle.cancel()
+  vim.wait(600, function()
+    return called
   end)
-  assert_ok(done, "grep fallback did not finish")
-  if callback_err then
-    error(callback_err, 0)
-  end
+  assert_ok(not called, "canceled lsp collection should not invoke callback")
+end)
+
+test("lsp source timeout finalizes without hanging", function()
+  -- Guards slow LSP behavior so refs time out cleanly instead of leaving collection stuck.
+  with_setup({
+    limits = {
+      refs = { max_results = 200, timeout_ms = 80 },
+    },
+  }, function()
+    local bufnr = open_typescript(fixture_root .. "/src/user_service.ts")
+    start_demo_lsp(bufnr, fixture_root, {
+      name = "wayfinder-demo-lsp-delayed-timeout",
+      cmd_env = { WAYFINDER_LSP_DELAY_MS = "200" },
+    })
+
+    vim.api.nvim_win_set_cursor(0, { 1, 18 })
+
+    local started = vim.uv.now()
+    await_callback(function(done)
+      return lsp_source.collect({
+        bufnr = bufnr,
+        path = fixture_root .. "/src/user_service.ts",
+        cwd = fixture_root,
+        project_root = fixture_root,
+        filetype = "typescript",
+        symbol = { text = "createUser" },
+      }, done)
+    end, function(items)
+      assert_ok(type(items) == "table", "expected timeout to finalize with a result table")
+    end, {
+      timeout_ms = 1000,
+      message = "timed lsp collection did not finish",
+    })
+    local elapsed = vim.uv.now() - started
+    assert_ok(elapsed < 500, "timed lsp collection should finalize promptly")
+  end)
 end)
 
 test("package scope limits grep references to the nearest package", function()
+  -- Guards package scope for grep fallback so broad text matches stay inside the nearest app/module.
   with_setup({
     scope = { mode = "package" },
     limits = {
@@ -381,43 +467,37 @@ test("package scope limits grep references to the nearest package", function()
     },
   }, function()
     local resolved_scope = scope_util.resolve(monorepo_fixture.web_file, monorepo_fixture.root)
-    local done = false
-    local callback_err = nil
+    vim.cmd.enew()
+    local scratch = vim.api.nvim_get_current_buf()
+    vim.bo[scratch].filetype = "typescript"
 
-    lsp_source.collect({
-      bufnr = 0,
-      path = monorepo_fixture.web_file,
-      cwd = monorepo_fixture.root,
-      project_root = monorepo_fixture.root,
-      scope_root = resolved_scope.root,
-      filetype = "typescript",
-      symbol = { text = "createUser" },
-    }, function(items)
-      local ok, err = pcall(function()
-        local grep_refs = vim.tbl_filter(function(item)
-          return item.facet == "refs" and item.source == "grep"
-        end, items)
-        assert_ok(#grep_refs == 2, "expected text-match limit to apply")
-        for _, item in ipairs(grep_refs) do
-          assert_ok(vim.startswith(item.path, monorepo_fixture.web_root .. "/"), "expected package-scoped text match")
-          assert_ok(not vim.startswith(item.path, monorepo_fixture.admin_root .. "/"), "expected admin package to be excluded")
-        end
-      end)
-      callback_err = err
-      done = true
-    end)
-
-    vim.wait(2000, function()
-      return done
-    end)
-    assert_ok(done, "package-scoped grep fallback did not finish")
-    if callback_err then
-      error(callback_err, 0)
-    end
+    await_callback(function(done)
+      return lsp_source.collect({
+        bufnr = scratch,
+        path = monorepo_fixture.web_file,
+        cwd = monorepo_fixture.root,
+        project_root = monorepo_fixture.root,
+        scope_root = resolved_scope.root,
+        filetype = "typescript",
+        symbol = { text = "createUser" },
+      }, done)
+    end, function(items)
+      local grep_refs = vim.tbl_filter(function(item)
+        return item.facet == "refs" and item.source == "grep"
+      end, items)
+      assert_ok(#grep_refs == 2, "expected text-match limit to apply")
+      for _, item in ipairs(grep_refs) do
+        assert_ok(vim.startswith(item.path, monorepo_fixture.web_root .. "/"), "expected package-scoped text match")
+        assert_ok(not vim.startswith(item.path, monorepo_fixture.admin_root .. "/"), "expected admin package to be excluded")
+      end
+    end, {
+      message = "package-scoped grep fallback did not finish",
+    })
   end)
 end)
 
 test("tests and git sources respect package scope and source limits", function()
+  -- Guards package scope and per-source caps for non-LSP sources in monorepo-style layouts.
   with_setup({
     scope = { mode = "package" },
     limits = {
@@ -427,55 +507,35 @@ test("tests and git sources respect package scope and source limits", function()
   }, function()
     local resolved_scope = scope_util.resolve(monorepo_fixture.web_file, monorepo_fixture.root)
 
-    local tests_done = false
-    local tests_err = nil
-    tests_source.collect({
-      path = monorepo_fixture.web_file,
-      cwd = monorepo_fixture.root,
-      project_root = monorepo_fixture.root,
-      scope_root = resolved_scope.root,
-      symbol = { text = "createUser" },
-    }, function(items)
-      local ok, err = pcall(function()
-        assert_ok(#items > 0, "expected package-scoped tests")
-        for _, item in ipairs(items) do
-          assert_ok(vim.startswith(item.path, monorepo_fixture.web_root .. "/"), "expected tests to stay inside package scope")
-        end
-      end)
-      tests_err = err
-      tests_done = true
-    end)
+    await_callback(function(done)
+      return tests_source.collect({
+        path = monorepo_fixture.web_file,
+        cwd = monorepo_fixture.root,
+        project_root = monorepo_fixture.root,
+        scope_root = resolved_scope.root,
+        symbol = { text = "createUser" },
+      }, done)
+    end, function(items)
+      assert_ok(#items > 0, "expected package-scoped tests")
+      for _, item in ipairs(items) do
+        assert_ok(vim.startswith(item.path, monorepo_fixture.web_root .. "/"), "expected tests to stay inside package scope")
+      end
+    end, {
+      message = "tests source did not finish",
+    })
 
-    vim.wait(2000, function()
-      return tests_done
-    end)
-    assert_ok(tests_done, "tests source did not finish")
-    if tests_err then
-      error(tests_err, 0)
-    end
-
-    local git_done = false
-    local git_err = nil
-    git_source.collect({
-      path = git_fixture_root .. "/src/user_service.ts",
-      cwd = git_fixture_root,
-      project_root = git_fixture_root,
-      scope_root = git_fixture_root,
-    }, function(items)
-      local ok, err = pcall(function()
-        assert_ok(#items == 1, "expected git commit limit to apply")
-      end)
-      git_err = err
-      git_done = true
-    end)
-
-    vim.wait(2000, function()
-      return git_done
-    end)
-    assert_ok(git_done, "git source did not finish")
-    if git_err then
-      error(git_err, 0)
-    end
+    await_callback(function(done)
+      return git_source.collect({
+        path = git_fixture_root .. "/src/user_service.ts",
+        cwd = git_fixture_root,
+        project_root = git_fixture_root,
+        scope_root = git_fixture_root,
+      }, done)
+    end, function(items)
+      assert_ok(#items == 1, "expected git commit limit to apply")
+    end, {
+      message = "git source did not finish",
+    })
   end)
 end)
 
@@ -485,5 +545,5 @@ if #failures > 0 then
   vim.cmd.cquit(1)
 else
   print("")
-  print("9 test(s) passed")
+  print("11 test(s) passed")
 end

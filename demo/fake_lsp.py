@@ -1,13 +1,16 @@
 #!/usr/bin/env python3
 
 import json
+import os
 import re
 import sys
+import time
 from pathlib import Path
 from urllib.parse import unquote, urlparse
 
 
 FUNCTION = 12
+DELAY_MS = int(os.environ.get("WAYFINDER_LSP_DELAY_MS", "0"))
 
 
 def read_message():
@@ -203,6 +206,14 @@ def response_for(request):
 
     if method in {"shutdown"}:
         return None
+
+    if DELAY_MS > 0 and method in {
+        "textDocument/definition",
+        "textDocument/references",
+        "textDocument/prepareCallHierarchy",
+        "callHierarchy/incomingCalls",
+    }:
+        time.sleep(DELAY_MS / 1000)
 
     if method == "textDocument/definition":
         uri = params["textDocument"]["uri"]

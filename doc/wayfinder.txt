@@ -196,7 +196,7 @@ Monorepo-friendly example:
       },
     },
     limits = {
-      refs = { max_results = 200 },
+      refs = { max_results = 200, timeout_ms = 1200 },
       text = { enabled = true, max_results = 100, timeout_ms = 800 },
       tests = { max_results = 50, timeout_ms = 700 },
       git = { enabled = true, max_commits = 15, timeout_ms = 400 },
@@ -211,6 +211,10 @@ Limits:
 
   limits.refs.max_results
       Cap semantic reference results after ordering.
+
+  limits.refs.timeout_ms
+      Finalize slow LSP-backed collection instead of leaving Wayfinder stuck
+      waiting on it.
 
   limits.text.enabled / max_results / timeout_ms
       Control grep-based Text Matches.

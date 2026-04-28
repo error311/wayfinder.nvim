@@ -16,6 +16,20 @@ local sources = {
 
 local M = {}
 
+local function cancel_session(session)
+  if not session or session.closed then
+    return
+  end
+
+  session.closed = true
+  for _, handle in pairs(session.pending or {}) do
+    if handle and handle.cancel then
+      pcall(handle.cancel)
+    end
+  end
+  session.pending = {}
+end
+
 local function source_key(target, symbol)
   return table.concat({
     target.path or "",
@@ -209,6 +223,7 @@ local function create_session()
     selection_index = 1,
     selection_id = nil,
     show_details = false,
+    closed = false,
     loading = true,
     counts = {
       all = 0,
@@ -225,6 +240,7 @@ local function create_session()
       tests = { loading = true, items = {} },
       git = { loading = true, items = {} },
     },
+    pending = {},
   }
 
   function session:refresh_visible()
@@ -232,15 +248,20 @@ local function create_session()
   end
 
   function session:reload()
+    cancel_session(self)
     state.cache = {}
     M.open()
+  end
+
+  function session:cancel()
+    cancel_session(self)
   end
 
   return session, target
 end
 
 local function update_session(session, source_name, source_items)
-  if state.current ~= session then
+  if state.current ~= session or session.closed then
     return
   end
 
@@ -248,6 +269,7 @@ local function update_session(session, source_name, source_items)
     loading = false,
     items = source_items or {},
   }
+  session.pending[source_name] = nil
   aggregate_items(session)
   layout.render(session)
   keymaps()
@@ -257,6 +279,10 @@ local function update_session(session, source_name, source_items)
 end
 
 local function load_source(session, target, symbol, source_name)
+  if session.closed then
+    return
+  end
+
   local key = source_name .. "::" .. source_key(target, symbol)
   local cached = state.cache_get(key, config.values.cache_ttl_ms)
   if cached then
@@ -264,7 +290,7 @@ local function load_source(session, target, symbol, source_name)
     return
   end
 
-  sources[source_name].collect({
+  local handle = sources[source_name].collect({
     bufnr = target.bufnr,
     path = target.path,
     cwd = target.cwd,
@@ -273,10 +299,20 @@ local function load_source(session, target, symbol, source_name)
     scope_root = target.scope and target.scope.root or nil,
     filetype = target.filetype,
     symbol = symbol,
+    is_stale = function()
+      return session.closed or state.current ~= session
+    end,
   }, function(found)
+    if session.closed or state.current ~= session then
+      return
+    end
     state.cache_set(key, found or {})
     update_session(session, source_name, found or {})
   end)
+
+  if handle then
+    session.pending[source_name] = handle
+  end
 end
 
 function M.setup(opts)
@@ -285,6 +321,7 @@ function M.setup(opts)
 end
 
 local function open_session(facet)
+  cancel_session(state.current)
   local session, target = create_session()
   if facet then
     session.facet = facet

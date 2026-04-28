@@ -18,6 +18,7 @@ local defaults = {
   limits = {
     refs = {
       max_results = 200,
+      timeout_ms = 1200,
     },
     text = {
       enabled = true,
@@ -63,7 +64,7 @@ local defaults = {
 local performance_presets = {
   fast = {
     limits = {
-      refs = { max_results = 120 },
+      refs = { max_results = 120, timeout_ms = 800 },
       text = { max_results = 60, timeout_ms = 450 },
       tests = { max_results = 30, timeout_ms = 450 },
       git = { max_commits = 8, timeout_ms = 250 },
@@ -71,7 +72,7 @@ local performance_presets = {
   },
   balanced = {
     limits = {
-      refs = { max_results = 200 },
+      refs = { max_results = 200, timeout_ms = 1200 },
       text = { max_results = 100, timeout_ms = 800 },
       tests = { max_results = 50, timeout_ms = 700 },
       git = { max_commits = 15, timeout_ms = 400 },
@@ -79,7 +80,7 @@ local performance_presets = {
   },
   full = {
     limits = {
-      refs = { max_results = 400 },
+      refs = { max_results = 400, timeout_ms = 2000 },
       text = { max_results = 200, timeout_ms = 1600 },
       tests = { max_results = 100, timeout_ms = 1200 },
       git = { max_commits = 25, timeout_ms = 900 },

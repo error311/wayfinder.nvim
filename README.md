@@ -30,7 +30,7 @@ It opens as a centered 3-pane picker, loads sources progressively, and keeps the
 - Dense result list with badges and grouped headers
 - Syntax-highlighted preview
 - Trail facet for pinned breadcrumbs
-- Async LSP, tests, and git loading
+- Async, cancelable LSP loading plus async tests and git loading
 - Local filter and jump actions
 
 ## Requirements
@@ -78,7 +78,7 @@ require("wayfinder").setup({
 You do not need to set any scope or performance options for normal repos.
 
 If you work in a large repo or monorepo, Wayfinder can narrow broad sources like
-text matches, likely tests, and git history.
+text matches, likely tests, and git history, while keeping slow LSP work bounded.
 
 Mental model:
 
@@ -104,7 +104,7 @@ require("wayfinder").setup({
     },
   },
   limits = {
-    refs = { max_results = 200 },
+    refs = { max_results = 200, timeout_ms = 1200 },
     text = { enabled = true, max_results = 100, timeout_ms = 800 },
     tests = { max_results = 50, timeout_ms = 700 },
     git = { enabled = true, max_commits = 15, timeout_ms = 400 },
@@ -202,7 +202,7 @@ Quickfix export:
   - `package` uses the nearest package/module marker
   - `file_dir` uses the current file directory
 - `limits` can cap expensive sources without changing the UI model:
-  - `refs.max_results`
+  - `refs.max_results`, `refs.timeout_ms`
   - `text.enabled`, `text.max_results`, `text.timeout_ms`
   - `tests.max_results`, `tests.timeout_ms`
   - `git.enabled`, `git.max_commits`, `git.timeout_ms`

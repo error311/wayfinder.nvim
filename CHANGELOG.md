@@ -1,5 +1,39 @@
 # Changelog
 
+## Changes 04/27/2026 (v0.1.5)
+
+`release(v0.1.5): keep Wayfinder responsive during slow LSP work`
+
+**Commit message**
+
+```text
+release(v0.1.5): keep Wayfinder responsive during slow LSP work
+
+- lsp(async): track and cancel stale LSP requests across open, close, refresh, and symbol changes
+- lsp(bounds): chunk large LSP response processing and finalize safely on timeout instead of blocking the editor
+- lsp(flow): defer expensive LSP facets slightly so the picker opens first and stays responsive while results load
+```
+
+**Changed**
+
+- **Async LSP request lifecycle**
+  - Wayfinder now tracks in-flight LSP requests per session and cancels or ignores stale work when the picker closes, refreshes, or reopens on a different symbol.
+  - Normal open and close paths stay responsive even when LSP-backed sources are still running.
+
+- **Bounded LSP result processing**
+  - Large LSP reference and caller payloads are processed in bounded chunks instead of one heavy pass on the main thread.
+  - Slow LSP-backed sources now finalize safely on timeout instead of leaving the picker stuck in a loading state.
+
+- **Non-blocking open path**
+  - Expensive LSP facets are deferred slightly behind the initial open so the centered picker appears first and remains interactive while results populate.
+
+**Added**
+
+- **Minimal LSP timeout control**
+  - Added `limits.refs.timeout_ms` as an optional cap for slow LSP-backed collection in large repositories.
+
+---
+
 ## Changes 04/27/2026 (v0.1.4)
 
 `release(v0.1.4): add scope and performance controls for large repos`

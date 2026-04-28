@@ -236,6 +236,9 @@ local function open_item(item, opener)
     push_tagstack(target_win, tagname)
   end
 
+  if session.cancel then
+    session:cancel()
+  end
   layout.close()
   state.current = nil
   if target_win and vim.api.nvim_win_is_valid(target_win) then
@@ -419,6 +422,9 @@ end
 function M.close()
   local session = current()
   local target_win = session and session.origin_win or nil
+  if session and session.cancel then
+    session:cancel()
+  end
   layout.close()
   state.current = nil
   if target_win and vim.api.nvim_win_is_valid(target_win) then
