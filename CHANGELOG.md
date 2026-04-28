@@ -27,6 +27,10 @@ release(v0.1.5): keep Wayfinder responsive during slow LSP work
 - **Non-blocking open path**
   - Expensive LSP facets are deferred slightly behind the initial open so the centered picker appears first and remains interactive while results populate.
 
+- **Full UI close on `:q`**
+  - Running `:q` from a focused Wayfinder pane now closes the full Wayfinder UI through the normal shutdown path instead of leaving part of the picker behind.
+  - This came in via PR #4. Thanks to @joshuamblanch for the contribution.
+
 **Added**
 
 - **Minimal LSP timeout control**
