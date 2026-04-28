@@ -1,5 +1,42 @@
 # Changelog
 
+## Changes 04/28/2026 (v0.1.6)
+
+`fix(v0.1.6): clean up highlight API usage and timer safety warnings`
+
+**Commit message**
+
+```text
+fix(v0.1.6): clean up highlight API usage and timer safety warnings
+
+- ui(layout): replace deprecated buffer highlight calls in the Wayfinder layout with extmark-based range highlights while preserving pane styling
+- preview: guard preview window attachment when the preview pane disappears mid-render
+- lsp(async): clarify timer lifecycle and nilability in LSP and async helpers to avoid stale timer warnings
+- util: normalize vim.system results and move debounce timers to vim.uv
+```
+
+**Fixed**
+
+- **Deprecated layout highlight API**
+  - Replaced deprecated buffer highlight calls in the Wayfinder layout renderer with extmark-based range highlights.
+  - Preserved the existing visual hierarchy for the facet rail, result list, top bar, and footer hints.
+
+- **Preview window safety**
+  - Fixed a case where preview rendering could try to attach a buffer to a preview window that had already been closed.
+
+- **Timer lifecycle warnings**
+  - Cleaned up timer handling in the LSP source and async helpers so timer creation and teardown are explicit and safer under static analysis.
+
+**Changed**
+
+- **Async helper result normalization**
+  - `vim.system()` results are now normalized before callback delivery instead of mutating the raw result object.
+
+- **Debounce timer backend**
+  - Debounce timers now use `vim.uv` consistently.
+
+---
+
 ## Changes 04/27/2026 (v0.1.5)
 
 `release(v0.1.5): keep Wayfinder responsive during slow LSP work`

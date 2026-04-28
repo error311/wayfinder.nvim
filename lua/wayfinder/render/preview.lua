@@ -104,6 +104,10 @@ end
 local function render_lines(session, item, filetype, lines, preview_start)
   local bufnr = ensure_buffer()
   local winid = state.ui.preview
+  if not winid or not vim.api.nvim_win_is_valid(winid) then
+    return
+  end
+
   local header = preview_header(session, item)
   local preview_width = state.ui.preview and vim.api.nvim_win_is_valid(state.ui.preview)
       and vim.api.nvim_win_get_width(state.ui.preview)

@@ -299,6 +299,7 @@ local function grep_references(ctx, callback)
   local collected = {}
   local pending = ""
   local job_id = nil
+  ---@type uv_timer_t?
   local timer = nil
 
   local function complete()
@@ -307,10 +308,11 @@ local function grep_references(ctx, callback)
     end
 
     finished = true
-    if timer then
-      timer:stop()
-      timer:close()
+    local active_timer = timer
+    if active_timer then
       timer = nil
+      active_timer:stop()
+      active_timer:close()
     end
     if job_id and job_id > 0 then
       pcall(vim.fn.jobstop, job_id)
@@ -420,10 +422,11 @@ local function grep_references(ctx, callback)
 
   register_cancel(ctx, function()
     finished = true
-    if timer then
-      timer:stop()
-      timer:close()
+    local active_timer = timer
+    if active_timer then
       timer = nil
+      active_timer:stop()
+      active_timer:close()
     end
     if job_id and job_id > 0 then
       pcall(vim.fn.jobstop, job_id)
@@ -431,7 +434,7 @@ local function grep_references(ctx, callback)
   end)
 
   if text_limits.timeout_ms and text_limits.timeout_ms > 0 then
-    timer = vim.uv.new_timer()
+    timer = assert(vim.uv.new_timer(), "wayfinder grep timer")
     timer:start(text_limits.timeout_ms, 0, function()
       vim.schedule(function()
         if finished then
@@ -587,6 +590,7 @@ function M.collect(ctx, callback)
   local cancelers = {}
   local results = {}
   local pending = 3
+  ---@type uv_timer_t?
   local timer = nil
   local refs_timeout_ms = vim.tbl_get(config.values, "limits", "refs", "timeout_ms")
 
@@ -608,10 +612,11 @@ function M.collect(ctx, callback)
 
     finished = true
     canceled = true
-    if timer then
-      timer:stop()
-      timer:close()
+    local active_timer = timer
+    if active_timer then
       timer = nil
+      active_timer:stop()
+      active_timer:close()
     end
     for _, cancel in ipairs(cancelers) do
       pcall(cancel)
@@ -647,7 +652,7 @@ function M.collect(ctx, callback)
   end, 20)
 
   if refs_timeout_ms and refs_timeout_ms > 0 then
-    timer = vim.uv.new_timer()
+    timer = assert(vim.uv.new_timer(), "wayfinder refs timer")
     timer:start(refs_timeout_ms, 0, function()
       vim.schedule(function()
         finalize()
@@ -663,10 +668,11 @@ function M.collect(ctx, callback)
 
       finished = true
       canceled = true
-      if timer then
-        timer:stop()
-        timer:close()
+      local active_timer = timer
+      if active_timer then
         timer = nil
+        active_timer:stop()
+        active_timer:close()
       end
       for _, cancel in ipairs(cancelers) do
         pcall(cancel)

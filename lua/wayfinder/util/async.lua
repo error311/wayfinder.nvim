@@ -1,5 +1,11 @@
 local M = {}
 
+---@class WayfinderSystemResult
+---@field code integer
+---@field stdout string
+---@field stderr string
+---@field timed_out? boolean
+
 function M.system(cmd, opts, on_exit)
   opts = opts or {}
   if vim.system then
@@ -12,8 +18,14 @@ function M.system(cmd, opts, on_exit)
 
     vim.system(cmd, system_opts, function(result)
       vim.schedule(function()
-        result.timed_out = result.code == 124 or result.code == 143 or result.code == -1
-        on_exit(result)
+        ---@type WayfinderSystemResult
+        local normalized = {
+          code = result.code,
+          stdout = result.stdout or "",
+          stderr = result.stderr or "",
+          timed_out = result.code == 124 or result.code == 143 or result.code == -1,
+        }
+        on_exit(normalized)
       end)
     end)
     return
@@ -69,15 +81,17 @@ function M.system(cmd, opts, on_exit)
 
   if opts.timeout_ms and job_id > 0 then
     timer = vim.uv.new_timer()
-    timer:start(opts.timeout_ms, 0, function()
-      timed_out = true
-      pcall(vim.fn.jobstop, job_id)
-      finish({
-        code = 124,
-        stdout = table.concat(stdout, "\n"),
-        stderr = table.concat(stderr, "\n"),
-      })
-    end)
+    if timer then
+      timer:start(opts.timeout_ms, 0, function()
+        timed_out = true
+        pcall(vim.fn.jobstop, job_id)
+        finish({
+          code = 124,
+          stdout = table.concat(stdout, "\n"),
+          stderr = table.concat(stderr, "\n"),
+        })
+      end)
+    end
   elseif job_id <= 0 then
     finish({
       code = -1,

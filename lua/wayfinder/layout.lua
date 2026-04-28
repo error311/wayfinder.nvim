@@ -12,6 +12,7 @@ local core_windows = { "border", "top", "facet", "list", "preview", "bottom" }
 local core_buffers = { "top_buf", "facet_buf", "list_buf", "preview_buf", "bottom_buf" }
 local close_group = vim.api.nvim_create_augroup("WayfinderClose", { clear = true })
 local closing = false
+local highlight_ns = vim.api.nvim_create_namespace("wayfinder.layout")
 
 local function interactive_windows()
   return {
@@ -69,13 +70,44 @@ local function set_lines(bufnr, lines)
   vim.bo[bufnr].modifiable = false
 end
 
-local function add_substring_highlights(bufnr, line, ranges, group)
+local function line_end_col(bufnr, line_nr)
+  local line = vim.api.nvim_buf_get_lines(bufnr, line_nr, line_nr + 1, false)[1] or ""
+  return #line
+end
+
+local function set_range_highlight(bufnr, line_nr, start_col, end_col, group, priority)
+  if not bufnr or not vim.api.nvim_buf_is_valid(bufnr) then
+    return
+  end
+
+  start_col = math.max(start_col or 0, 0)
+  if end_col == -1 then
+    end_col = line_end_col(bufnr, line_nr)
+  else
+    end_col = math.max(end_col or start_col, start_col)
+  end
+
+  if end_col <= start_col then
+    return
+  end
+
+  vim.api.nvim_buf_set_extmark(bufnr, highlight_ns, line_nr, start_col, {
+    end_col = end_col,
+    hl_group = group,
+    priority = priority or 100,
+    strict = false,
+  })
+end
+
+local function add_substring_highlights(bufnr, line_nr, line, ranges, group, priority_base)
   local cursor = 1
+  local priority = priority_base or 100
   for _, needle in ipairs(ranges) do
     local start_col = line:find(needle, cursor, true)
     if start_col then
-      vim.api.nvim_buf_add_highlight(bufnr, -1, group, 0, start_col - 1, start_col - 1 + #needle)
+      set_range_highlight(bufnr, line_nr, start_col - 1, start_col - 1 + #needle, group, priority)
       cursor = start_col + #needle
+      priority = priority + 1
     end
   end
 end
@@ -316,12 +348,12 @@ function M.interactive_window(winid)
 end
 
 local function add_highlights(bufnr, grouped)
-  vim.api.nvim_buf_clear_namespace(bufnr, -1, 0, -1)
+  vim.api.nvim_buf_clear_namespace(bufnr, highlight_ns, 0, -1)
   for line, chunks in pairs(grouped or {}) do
-    for _, item in ipairs(chunks) do
+    for index, item in ipairs(chunks) do
       local start_col = math.max((item.start_col or 1) - 1, 0)
       local end_col = item.end_col == -1 and -1 or math.max((item.end_col or start_col + 1) - 1, start_col)
-      vim.api.nvim_buf_add_highlight(bufnr, -1, item.group, line - 1, start_col, end_col)
+      set_range_highlight(bufnr, line - 1, start_col, end_col, item.group, 100 + index)
     end
   end
 end
@@ -424,9 +456,9 @@ function M.render(session)
 
   local top_lines = { top_line }
   set_lines(state.ui.top_buf, top_lines)
-  vim.api.nvim_buf_clear_namespace(state.ui.top_buf, -1, 0, -1)
-  for _, item in ipairs(top_highlights) do
-    vim.api.nvim_buf_add_highlight(state.ui.top_buf, -1, item.group, 0, item.start_col, item.end_col)
+  vim.api.nvim_buf_clear_namespace(state.ui.top_buf, highlight_ns, 0, -1)
+  for index, item in ipairs(top_highlights) do
+    set_range_highlight(state.ui.top_buf, 0, item.start_col, item.end_col, item.group, 100 + index)
   end
 
   local facet_rows = facets.rows(session)
@@ -448,21 +480,25 @@ function M.render(session)
     " p pin   P trail   x export   dd remove   da clear   D details   / filter   q close ",
   }
   set_lines(state.ui.bottom_buf, bottom_lines)
-  vim.api.nvim_buf_clear_namespace(state.ui.bottom_buf, -1, 0, -1)
+  vim.api.nvim_buf_clear_namespace(state.ui.bottom_buf, highlight_ns, 0, -1)
   for line = 0, #bottom_lines - 1 do
-    vim.api.nvim_buf_add_highlight(state.ui.bottom_buf, -1, "WayfinderDim", line, 1, -1)
+    set_range_highlight(state.ui.bottom_buf, line, 1, -1, "WayfinderDim", 100)
   end
   add_substring_highlights(
     state.ui.bottom_buf,
+    0,
     bottom_lines[1],
     { "<CR>", "j/k", "gg/G", "<C-u>/<C-d>", "h/l", "<Tab>", "<S-Tab>" },
-    "WayfinderHeader"
+    "WayfinderHeader",
+    200
   )
   add_substring_highlights(
     state.ui.bottom_buf,
+    1,
     bottom_lines[2],
     { "p", "P", "x", "dd", "da", "D", "/", "q" },
-    "WayfinderHeader"
+    "WayfinderHeader",
+    200
   )
 
   preview_debounced(session)

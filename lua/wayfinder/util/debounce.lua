@@ -1,7 +1,7 @@
 local M = {}
 
 function M.new(delay, fn)
-  local timer = vim.loop.new_timer()
+  local timer = assert(vim.uv.new_timer(), "wayfinder debounce timer")
 
   return function(...)
     local args = { ... }
