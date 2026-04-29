@@ -402,6 +402,8 @@ function M.render(session)
   local subject = session.mode == "symbol" and session.subject or vim.fs.basename(session.path)
   local source_file = session.mode == "symbol" and paths.display(session.path, session.project_root or session.cwd) or nil
   local scope_label = session.scope and session.scope.mode ~= "project" and session.scope.label or nil
+  local trail_count = session.counts and session.counts.trail or 0
+  local trail_label = trail_count > 0 and string.format("Trail • %d item%s", trail_count, trail_count == 1 and "" or "s") or nil
   local count_label = string.format("%d results", #session.visible_items)
   local loading_label = session.loading and "loading…" or nil
   local filter_label = session.filter ~= "" and ("/" .. session.filter) or nil
@@ -436,6 +438,9 @@ function M.render(session)
   if notice then
     table.insert(top_segments, { text = separator })
     table.insert(top_segments, { text = notice, group = "WayfinderTrail" })
+  elseif trail_label then
+    table.insert(top_segments, { text = separator })
+    table.insert(top_segments, { text = trail_label, group = "WayfinderTrail" })
   end
 
   local top_line = ""

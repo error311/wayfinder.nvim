@@ -165,6 +165,7 @@ vim.keymap.set("n", "<leader>wts", "<Plug>(WayfinderTrailShow)", { desc = "Wayfi
 - `dd` remove pinned trail item
 - `da` clear Trail
 - `/` filter
+- `<C-l>` clear filter
 - `D` toggle details
 - `r` refresh
 - `q` close
@@ -181,8 +182,8 @@ Filter examples:
 Pinning behavior:
 
 - the first `p` pins the current item
-- after the second pin, Wayfinder switches to `Trail` automatically
-- the top bar shows a short Trail hint when you pin an item
+- `P` opens the Trail facet explicitly
+- the top bar shows a short Trail hint when you pin an item, then keeps a steady Trail item count once Trail is non-empty
 
 Trail commands outside Wayfinder:
 

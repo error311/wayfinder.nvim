@@ -265,14 +265,10 @@ function M.open_tab()
 end
 
 function M.pin()
-  local session = current()
   local item = selection_item()
   if item and trail.pin(item) then
     local trail_count = #trail.items()
-    state.set_notice(trail_count == 1 and "Pinned to Trail" or string.format("Pinned to Trail • %d items", trail_count))
-    if session and trail_count >= 2 and session.facet ~= "trail" then
-      open_facet(session, "trail")
-    end
+    state.set_notice(string.format("Pinned to Trail • %d item%s", trail_count, trail_count == 1 and "" or "s"), 1800)
     rerender()
   end
 end
@@ -401,6 +397,18 @@ function M.filter()
     session.selection_index = 1
     rerender()
   end)
+end
+
+function M.clear_filter()
+  local session = current()
+  if not session or session.filter == "" then
+    return
+  end
+
+  session.filter = ""
+  session.selection_id = nil
+  session.selection_index = 1
+  rerender()
 end
 
 function M.refresh()

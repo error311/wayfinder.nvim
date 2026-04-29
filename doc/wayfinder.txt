@@ -118,6 +118,7 @@ Example mappings:
   dd         Remove current Trail item
   da         Clear Trail
   /          Set local filter
+  <C-l>      Clear local filter
   D          Toggle optional details
   r          Refresh
   q          Close

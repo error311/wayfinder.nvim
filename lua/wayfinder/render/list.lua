@@ -159,12 +159,16 @@ function M.rows(session)
       and text.truncate_middle(secondary, math.max(list_width - 4, 1))
       or text.truncate_end(secondary, math.max(list_width - 4, 1))
 
+    local pinned_icon = item.pinned and config.values.icons.pinned or " "
     row = row + 1
-    rows[row] = string.format("%s   %s", prefix, secondary)
+    rows[row] = string.format("%s %s %s", prefix, pinned_icon, secondary)
     actions[row] = item
     highlights[row] = {
       { group = secondary_group(item), start_col = 5, end_col = -1 },
     }
+    if item.pinned then
+      table.insert(highlights[row], { group = "WayfinderTrail", start_col = 3, end_col = 4 })
+    end
 
     if selected then
       highlights[row - 1] = highlights[row - 1] or {}

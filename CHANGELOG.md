@@ -1,5 +1,41 @@
 # Changelog
 
+## Changes 04/29/2026 (v0.1.8)
+
+`fix(v0.1.8): refine Trail pinning flow and preview context`
+
+**Commit message**
+
+```text
+fix(v0.1.8): refine Trail pinning flow and preview context
+
+- trail(pin): stop auto-switching into the Trail facet when pinning multiple items
+- ui(list): mark already-pinned items on the second row of each result
+- ui(topbar): keep Trail item counts visible after pin notices expire
+- keys(filter): add <C-l> to clear the current local filter in-place
+- preview(header): show a project-relative path line above the snippet so file context is visible without taking over the preview
+```
+
+**Changed**
+
+- **Lighter pin flow**
+  - Pinning no longer forces Wayfinder into the `Trail` facet after the second item, so collecting several items in a row stays focused on the current facet.
+
+- **Pinned item markers**
+  - Result rows now show a small pinned marker on the second line once an item has already been added to Trail.
+
+- **Persistent Trail status**
+  - The top bar now keeps a steady `Trail • N items` status after the temporary `Pinned to Trail` notice expires, so the Trail state stays visible across facet changes.
+
+- **Faster filter reset**
+  - Added `<C-l>` inside Wayfinder to clear the current local filter and rerender immediately without reopening the picker.
+
+- **Preview file context**
+  - The preview pane now uses a project-relative path line above the snippet instead of starting code on the first row.
+  - This keeps the current file context visible while leaving the code preview itself as the main focus.
+
+---
+
 ## Changes 04/29/2026 (v0.1.7)
 
 `release(v0.1.7): add smarter local filter terms`

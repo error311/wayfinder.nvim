@@ -1,5 +1,6 @@
 vim.opt.runtimepath:append(vim.fn.getcwd())
 vim.opt.swapfile = false
+---@diagnostic disable-next-line: duplicate-set-field
 vim.notify = function() end
 
 local wayfinder = require("wayfinder")
@@ -278,7 +279,9 @@ test("quickfix export preserves visible order and trail order", function()
 
   local saved_render = layout.render
   local saved_focus = layout.focus_primary
+  ---@diagnostic disable-next-line: duplicate-set-field
   layout.render = function() end
+  ---@diagnostic disable-next-line: duplicate-set-field
   layout.focus_primary = function() end
 
   state.current = {

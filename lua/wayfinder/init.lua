@@ -80,6 +80,7 @@ local function filtered_items(session)
   local all_items = {}
   for _, item in ipairs(session.items) do
     if session.facet == "all" or session.facet == item.facet then
+      item.pinned = trail.has(item.id)
       table.insert(all_items, item)
     end
   end
@@ -190,6 +191,7 @@ local function keymaps()
       map("dd", actions.remove_trail_item)
       map("da", actions.clear_trail)
       map("/", actions.filter)
+      map("<C-l>", actions.clear_filter)
       map("r", actions.refresh)
       map("D", actions.toggle_details)
       map("q", actions.close)

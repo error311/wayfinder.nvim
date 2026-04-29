@@ -55,18 +55,21 @@ end
 
 local function preview_header(session, item)
   if not item then
-    return " Preview"
+    return {
+      line = " Preview",
+      filename = nil,
+    }
   end
 
-  local path = paths.display(item.path, session.cwd)
-  local kind = item.kind and item.kind:gsub("^%l", string.upper) or "Item"
-  local source = item.source and item.source:upper() or "ITEM"
-  local ordinal = string.format("%d/%d", session.selection_index or 1, math.max(#(session.visible_items or {}), 1))
-  local header = string.format(" %s  •  %s  •  %s  •  %s ", path, kind, source, ordinal)
+  local display_path = paths.display(item.path, session.project_root or session.cwd)
+  local filename = vim.fs.basename(item.path or display_path)
   local width = state.ui.preview and vim.api.nvim_win_is_valid(state.ui.preview)
       and math.max(vim.api.nvim_win_get_width(state.ui.preview) - 1, 1)
     or 80
-  return " " .. text.truncate_middle(header, width - 1)
+  return {
+    line = " " .. text.truncate_middle(display_path, width - 1),
+    filename = filename,
+  }
 end
 
 local function snippet_window(item)
@@ -91,7 +94,7 @@ local function add_line_numbers(bufnr, lines, preview_start)
   local width = math.max(#tostring((preview_start or 1) + #lines - 1), 2)
   for index = 1, #lines do
     local lnum = preview_start + index - 1
-    vim.api.nvim_buf_set_extmark(bufnr, state.ui.preview_ns, index - 1, 0, {
+    vim.api.nvim_buf_set_extmark(bufnr, state.ui.preview_ns, index, 0, {
       virt_text = {
         { string.format("%" .. width .. "d ", lnum), "WayfinderDim" },
       },
@@ -109,13 +112,10 @@ local function render_lines(session, item, filetype, lines, preview_start)
   end
 
   local header = preview_header(session, item)
-  local preview_width = state.ui.preview and vim.api.nvim_win_is_valid(state.ui.preview)
-      and vim.api.nvim_win_get_width(state.ui.preview)
-    or 80
-  local divider = " " .. string.rep("─", math.max(preview_width - 2, 1))
   local normalized_lines = normalize_lines(lines)
+  local buffer_lines = vim.list_extend({ header.line }, normalized_lines)
 
-  set_preview_buffer(bufnr, normalized_lines, filetype)
+  set_preview_buffer(bufnr, buffer_lines, filetype)
   vim.api.nvim_win_set_buf(winid, bufnr)
   vim.wo[winid].number = false
   vim.wo[winid].relativenumber = false
@@ -126,13 +126,21 @@ local function render_lines(session, item, filetype, lines, preview_start)
 
   clear_highlights(bufnr)
   vim.api.nvim_buf_set_extmark(bufnr, state.ui.preview_ns, 0, 0, {
-    virt_lines = {
-      { { header, "WayfinderDim" } },
-      { { divider, "WayfinderDim" } },
-    },
-    virt_lines_above = true,
+    end_row = 1,
+    hl_group = "WayfinderDim",
+    hl_eol = true,
     priority = 200,
   })
+  if header.filename and header.filename ~= "" then
+    local start_col = header.line:find(header.filename, 1, true)
+    if start_col then
+      vim.api.nvim_buf_set_extmark(bufnr, state.ui.preview_ns, 0, start_col - 1, {
+        end_col = start_col - 1 + #header.filename,
+        hl_group = "WayfinderPath",
+        priority = 220,
+      })
+    end
+  end
   add_line_numbers(bufnr, normalized_lines, preview_start)
 
   if item then
@@ -146,21 +154,21 @@ local function render_lines(session, item, filetype, lines, preview_start)
     local end_line = math.max((item.preview_range and item.preview_range["end"] or (target_line + 2)), start_line + 1)
     local preview_offset = math.max(start_line - (preview_start or start_line), 0)
     local target_offset = math.max(target_line - (preview_start or target_line), 0)
-    local extmark_start = math.min(preview_offset, line_count - 1)
+    local extmark_start = math.min(preview_offset, line_count - 1) + 1
     local extmark_end = math.min(
       preview_offset + math.max(end_line - start_line, 1),
       line_count
     )
-    local target_extmark = math.min(target_offset, line_count - 1)
+    local target_extmark = math.min(target_offset, line_count - 1) + 1
 
     vim.api.nvim_buf_set_extmark(bufnr, state.ui.preview_ns, extmark_start, 0, {
-      end_line = math.max(extmark_end, extmark_start + 1),
+      end_line = math.max(extmark_end + 1, extmark_start + 1),
       hl_group = "WayfinderPreviewContext",
       hl_eol = true,
       priority = 60,
     })
     vim.api.nvim_buf_set_extmark(bufnr, state.ui.preview_ns, target_extmark, 0, {
-      end_line = math.min(target_extmark + 1, line_count),
+      end_line = math.min(target_extmark + 1, line_count + 1),
       hl_group = "WayfinderPreviewTarget",
       hl_eol = true,
       priority = 90,

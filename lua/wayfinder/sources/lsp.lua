@@ -9,6 +9,16 @@ local M = {}
 
 local BATCH_SIZE = 40
 
+---@param timer uv.uv_timer_t?
+---@return nil
+local function clear_timer(timer)
+  if timer then
+    timer:stop()
+    timer:close()
+  end
+  return nil
+end
+
 local function location_key(item)
   return table.concat({
     item.facet or "",
@@ -299,7 +309,7 @@ local function grep_references(ctx, callback)
   local collected = {}
   local pending = ""
   local job_id = nil
-  ---@type uv_timer_t?
+  ---@type uv.uv_timer_t?
   local timer = nil
 
   local function complete()
@@ -308,12 +318,7 @@ local function grep_references(ctx, callback)
     end
 
     finished = true
-    local active_timer = timer
-    if active_timer then
-      timer = nil
-      active_timer:stop()
-      active_timer:close()
-    end
+    timer = clear_timer(timer)
     if job_id and job_id > 0 then
       pcall(vim.fn.jobstop, job_id)
     end
@@ -422,12 +427,7 @@ local function grep_references(ctx, callback)
 
   register_cancel(ctx, function()
     finished = true
-    local active_timer = timer
-    if active_timer then
-      timer = nil
-      active_timer:stop()
-      active_timer:close()
-    end
+    timer = clear_timer(timer)
     if job_id and job_id > 0 then
       pcall(vim.fn.jobstop, job_id)
     end
@@ -462,8 +462,10 @@ local function gather_references(ctx, push)
   local refs_limit = config.values.limits.refs.max_results
 
   local function collect(include_declaration, done)
-    local params = current_params(ctx.bufnr)
-    params.context = { includeDeclaration = include_declaration }
+    ---@type lsp.ReferenceParams
+    local params = vim.tbl_extend("force", current_params(ctx.bufnr), {
+      context = { includeDeclaration = include_declaration },
+    })
 
     request_all(ctx.bufnr, "textDocument/references", params, ctx, function(responses)
       process_response_locations(responses, function(location, current_ctx)
@@ -590,7 +592,7 @@ function M.collect(ctx, callback)
   local cancelers = {}
   local results = {}
   local pending = 3
-  ---@type uv_timer_t?
+  ---@type uv.uv_timer_t?
   local timer = nil
   local refs_timeout_ms = vim.tbl_get(config.values, "limits", "refs", "timeout_ms")
 
@@ -612,12 +614,7 @@ function M.collect(ctx, callback)
 
     finished = true
     canceled = true
-    local active_timer = timer
-    if active_timer then
-      timer = nil
-      active_timer:stop()
-      active_timer:close()
-    end
+    timer = clear_timer(timer)
     for _, cancel in ipairs(cancelers) do
       pcall(cancel)
     end
@@ -668,12 +665,7 @@ function M.collect(ctx, callback)
 
       finished = true
       canceled = true
-      local active_timer = timer
-      if active_timer then
-        timer = nil
-        active_timer:stop()
-        active_timer:close()
-      end
+      timer = clear_timer(timer)
       for _, cancel in ipairs(cancelers) do
         pcall(cancel)
       end
