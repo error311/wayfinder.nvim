@@ -8,6 +8,7 @@ local symbol_util = require("wayfinder.util.symbol")
 local items = require("wayfinder.util.items")
 local paths = require("wayfinder.util.paths")
 local scope = require("wayfinder.util.scope")
+local filter = require("wayfinder.util.filter")
 local sources = {
   lsp = require("wayfinder.sources.lsp"),
   tests = require("wayfinder.sources.tests"),
@@ -101,11 +102,9 @@ local function filtered_items(session)
     return all_items
   end
 
-  local needle = session.filter:lower()
+  local query = filter.parse(session.filter)
   return vim.tbl_filter(function(item)
-    return (item.label and item.label:lower():find(needle, 1, true))
-      or (item.secondary and item.secondary:lower():find(needle, 1, true))
-      or (item.detail and item.detail:lower():find(needle, 1, true))
+    return filter.match(item, query)
   end, all_items)
 end
 

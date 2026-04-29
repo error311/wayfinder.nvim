@@ -31,7 +31,8 @@ It opens as a centered 3-pane picker, loads sources progressively, and keeps the
 - Syntax-highlighted preview
 - Trail facet for pinned breadcrumbs
 - Async, cancelable LSP loading plus async tests and git loading
-- Local filter and jump actions
+- Local filter with negation and phrase matching
+- Jump actions
 
 ## Requirements
 
@@ -168,6 +169,14 @@ vim.keymap.set("n", "<leader>wts", "<Plug>(WayfinderTrailShow)", { desc = "Wayfi
 - `r` refresh
 - `q` close
 - mouse wheel scrolls results
+
+Filter examples:
+
+- `user` matches `user`
+- `user test` requires both terms
+- `user !spec` excludes matches containing `spec`
+- `"user service"` matches that exact phrase
+- `create !"git status"` excludes that exact phrase
 
 Pinning behavior:
 

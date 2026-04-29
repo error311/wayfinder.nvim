@@ -9,6 +9,7 @@ local trail = require("wayfinder.trail")
 local lsp_source = require("wayfinder.sources.lsp")
 local tests_source = require("wayfinder.sources.tests")
 local git_source = require("wayfinder.sources.git")
+local filter_util = require("wayfinder.util.filter")
 local scope_util = require("wayfinder.util.scope")
 
 wayfinder.setup()
@@ -310,6 +311,27 @@ test("quickfix export preserves visible order and trail order", function()
   state.current = nil
 end)
 
+test("filter parser supports positive negated and quoted terms", function()
+  -- Guards the local query parser so multi-term, negated, and quoted filters stay predictable.
+  local parsed = filter_util.parse('user !test "service layer" !"git status"')
+  assert_ok(vim.deep_equal(parsed.include, { "user", "service layer" }), "expected positive terms to parse")
+  assert_ok(vim.deep_equal(parsed.exclude, { "test", "git status" }), "expected negated terms to parse")
+end)
+
+test("filter matcher uses and semantics with negation", function()
+  -- Guards the upgraded filter matcher so include terms must all match and excluded terms remove items.
+  local item = {
+    label = "create user service",
+    secondary = "tests/user_service_spec.ts",
+    detail = "src/user_service.ts",
+  }
+
+  assert_ok(filter_util.match(item, "create user"), "expected include terms to AND together")
+  assert_ok(not filter_util.match(item, "create account"), "expected missing include term to fail")
+  assert_ok(not filter_util.match(item, "create !spec"), "expected negated term to exclude a match")
+  assert_ok(filter_util.match(item, '"user service" !git'), "expected phrase include and unrelated negation to pass")
+end)
+
 test("tests source finds likely tests", function()
   -- Guards the heuristic test source so it keeps returning useful candidates.
   await_callback(function(done)
@@ -545,5 +567,5 @@ if #failures > 0 then
   vim.cmd.cquit(1)
 else
   print("")
-  print("11 test(s) passed")
+  print("13 test(s) passed")
 end

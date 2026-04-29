@@ -122,6 +122,20 @@ Example mappings:
   r          Refresh
   q          Close
 
+Filter examples:
+
+  user
+      Match items containing `user`.
+
+  user test
+      Match items containing both `user` and `test`.
+
+  user !spec
+      Exclude items containing `spec`.
+
+  "user service"
+      Match the exact phrase `user service`.
+
 ==============================================================================
 4. Trail Commands                              *wayfinder-trail-commands*
 

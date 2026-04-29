@@ -1,5 +1,36 @@
 # Changelog
 
+## Changes 04/29/2026 (v0.1.7)
+
+`release(v0.1.7): add smarter local filter terms`
+
+**Commit message**
+
+```text
+release(v0.1.7): add smarter local filter terms
+
+- filter(query): support space-separated include terms with AND matching
+- filter(negation): support !term exclusions in the local Wayfinder filter
+- filter(phrases): support double-quoted exact phrases in local filter queries
+```
+
+**Added**
+
+- **Smarter local filter queries**
+  - Added space-separated positive terms with AND semantics to Wayfinder's local `/` filter.
+  - Added negated terms with `!term` so obvious noise can be excluded quickly.
+  - Added double-quoted phrase matching for exact multi-word terms.
+
+**Changed**
+
+- **Filter matching behavior**
+  - Local filtering now matches against `label`, `secondary`, and `detail` using parsed include/exclude terms instead of a single raw substring.
+
+- **Demo media refresh**
+  - Refreshed the README screenshots and animated demo to show the current Wayfinder flow, including local filter usage, result movement, Trail pinning, and jump behavior.
+
+---
+
 ## Changes 04/28/2026 (v0.1.6)
 
 `fix(v0.1.6): clean up highlight API usage and timer safety warnings`
