@@ -179,6 +179,59 @@ local function create_window(bufnr, config_opts, opts)
   return winid
 end
 
+local function resolve_dimensions()
+  local width = math.floor(vim.o.columns * config.values.layout.width)
+  local height = math.floor(vim.o.lines * config.values.layout.height)
+  local header_height = 1
+  local footer_height = 2
+  local min_facet_width = 12
+  local min_list_width = 24
+  local min_preview_width = 18
+  local min_body_height = 4
+
+  local available_width = width - 6
+  local facet_width = math.min(
+    config.values.layout.facet_width,
+    math.max(min_facet_width, math.floor(available_width * 0.22))
+  )
+  local list_width = math.min(
+    config.values.layout.list_width,
+    math.max(min_list_width, math.floor(available_width * 0.38))
+  )
+  local preview_width = available_width - facet_width - list_width
+  local body_height = height - header_height - footer_height - 2
+
+  if preview_width < min_preview_width then
+    local shortage = min_preview_width - preview_width
+    local reduce_list = math.min(shortage, list_width - min_list_width)
+    list_width = list_width - reduce_list
+    shortage = shortage - reduce_list
+
+    local reduce_facet = math.min(shortage, facet_width - min_facet_width)
+    facet_width = facet_width - reduce_facet
+    preview_width = available_width - facet_width - list_width
+  end
+
+  if preview_width < min_preview_width or body_height < min_body_height then
+    return nil, string.format(
+      "Wayfinder: editor too small (%dx%d). Need enough room for the 3-pane layout.",
+      vim.o.columns,
+      vim.o.lines
+    )
+  end
+
+  return {
+    width = width,
+    height = height,
+    facet_width = facet_width,
+    list_width = list_width,
+    preview_width = preview_width,
+    header_height = header_height,
+    footer_height = footer_height,
+    body_height = body_height,
+  }
+end
+
 function M.close()
   clear_ui()
 end
@@ -190,16 +243,22 @@ end
 function M.open()
   clear_ui()
 
-  local width = math.floor(vim.o.columns * config.values.layout.width)
-  local height = math.floor(vim.o.lines * config.values.layout.height)
+  local dims, err = resolve_dimensions()
+  if not dims then
+    vim.notify(err, vim.log.levels.WARN)
+    return false
+  end
+
+  local width = dims.width
+  local height = dims.height
   local row = math.floor((vim.o.lines - height) / 2) - 1
   local col = math.floor((vim.o.columns - width) / 2)
-  local facet_width = config.values.layout.facet_width
-  local list_width = config.values.layout.list_width
-  local header_height = 1
-  local footer_height = 2
-  local body_height = height - header_height - footer_height - 2
-  local preview_width = width - facet_width - list_width - 6
+  local facet_width = dims.facet_width
+  local list_width = dims.list_width
+  local header_height = dims.header_height
+  local footer_height = dims.footer_height
+  local body_height = dims.body_height
+  local preview_width = dims.preview_width
 
   local border_buf = create_buf("wayfinder://border")
   state.ui.border = create_window(border_buf, {
@@ -335,6 +394,8 @@ function M.open()
   if state.ui.list and vim.api.nvim_win_is_valid(state.ui.list) then
     vim.api.nvim_set_current_win(state.ui.list)
   end
+
+  return true
 end
 
 function M.focus_primary()
@@ -399,7 +460,9 @@ end
 
 function M.render(session)
   if not M.is_open() then
-    M.open()
+    if not M.open() then
+      return false
+    end
   end
 
   local notice = state.notice_text()
@@ -512,6 +575,7 @@ function M.render(session)
   )
 
   preview_debounced(session)
+  return true
 end
 
 return M

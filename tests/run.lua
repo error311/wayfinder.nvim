@@ -314,6 +314,26 @@ test("quickfix export preserves visible order and trail order", function()
   state.current = nil
 end)
 
+test("wayfinder exits cleanly when the editor is too small", function()
+  -- Guards the narrow-window path so Wayfinder warns and aborts instead of crashing on invalid pane sizes.
+  local saved_columns = vim.o.columns
+  local saved_lines = vim.o.lines
+
+  local bufnr = open_typescript(fixture_root .. "/src/user_service.ts")
+  vim.api.nvim_win_set_cursor(0, { 1, 18 })
+
+  vim.o.columns = 60
+  vim.o.lines = 14
+
+  local ok, err = pcall(wayfinder.open)
+
+  vim.o.columns = saved_columns
+  vim.o.lines = saved_lines
+
+  assert_ok(ok, err or "expected Wayfinder to fail gracefully in a small editor")
+  assert_ok(state.current == nil, "small editor open should not leave an active Wayfinder session")
+end)
+
 test("filter parser supports positive negated and quoted terms", function()
   -- Guards the local query parser so multi-term, negated, and quoted filters stay predictable.
   local parsed = filter_util.parse('user !test "service layer" !"git status"')

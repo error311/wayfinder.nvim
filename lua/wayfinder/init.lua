@@ -330,7 +330,11 @@ local function open_session(facet)
   end
   state.current = session
   aggregate_items(session)
-  layout.render(session)
+  if not layout.render(session) then
+    session.closed = true
+    state.current = nil
+    return
+  end
   keymaps()
   layout.focus_primary()
 

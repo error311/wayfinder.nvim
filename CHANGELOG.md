@@ -1,5 +1,39 @@
 # Changelog
 
+## Changes 04/30/2026 (v0.1.9)
+
+`fix(v0.1.9): harden layout borders and narrow-editor opens`
+
+**Commit message**
+
+```text
+fix(v0.1.9): harden layout borders and narrow-editor opens
+
+- ui(border): default inner pane floats to border = "none" so global winborder settings do not break the 3-pane layout
+- layout(size): detect editors that are too small for the centered 3-pane UI and abort cleanly instead of opening invalid pane widths
+- tests(layout): add a regression test for the narrow-editor path so small windows warn and exit without leaving a stale Wayfinder session
+```
+
+**Fixed**
+
+- **Inner pane border inheritance**
+  - Inner Wayfinder panes now default to `border = "none"` unless they explicitly request a border, so global `winborder` settings no longer add nested borders inside the picker.
+  - The outer Wayfinder frame still keeps its configured border style.
+  - This came in via PR #6. Thanks to @tomerlevy1 for the contribution.
+
+- **Small editor crash**
+  - Fixed a case where very narrow editor windows could drive the preview pane width to zero or below and crash Wayfinder with an invalid float width error.
+
+**Changed**
+
+- **Graceful narrow-window fallback**
+  - Wayfinder now detects when the current editor is too small for the 3-pane layout, shows a short warning, and aborts cleanly instead of half-opening broken UI state.
+
+- **Regression coverage for layout sizing**
+  - Added a headless test for the too-small editor path so layout changes can keep this failure mode from regressing.
+
+---
+
 ## Changes 04/29/2026 (v0.1.8)
 
 `fix(v0.1.8): refine Trail pinning flow and preview context`
