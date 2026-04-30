@@ -153,6 +153,11 @@ local function create_window(bufnr, config_opts, opts)
   if opts.zindex then
     config_opts.zindex = opts.zindex
   end
+  -- Opt out of vim.o.winborder (Neovim 0.11+) for inner panes that don't
+  -- explicitly request a border. The outer border window sets its own.
+  if config_opts.border == nil then
+    config_opts.border = "none"
+  end
 
   local winid = vim.api.nvim_open_win(bufnr, false, config_opts)
   vim.wo[winid].winhighlight = table.concat({
