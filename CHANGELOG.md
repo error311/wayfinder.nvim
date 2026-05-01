@@ -1,5 +1,38 @@
 # Changelog
 
+## Changes 05/01/2026 (v0.1.10)
+
+`release(v0.1.10): add compact match reasons for weaker result sources`
+
+**Commit message**
+
+```text
+release(v0.1.10): add compact match reasons for weaker result sources
+
+- refs(text): show a small plain-text fallback reason for grep-backed Text Matches
+- tests(heuristics): show a concise why-this-matched reason for likely-test results
+- git(selection): show a small file-touch reason for the selected Git item while keeping commit metadata in details
+```
+
+**Changed**
+
+- **Clearer weak-source trust hints**
+  - Text Matches, likely Tests, and Git selections can now surface a concise top-bar reason explaining why the current item showed up.
+  - This keeps weaker sources more trustworthy without cluttering the existing 2-line row model.
+
+- **Examples of selection reasons**
+  - Text Matches use a plain-text fallback reason.
+  - Test matches can surface filename or symbol-text matching.
+  - Git selections explain that the commit touched the current file.
+
+- **Filter matching includes reasons**
+  - The local `/` filter now matches against these row reasons too, so filtering stays consistent with what the list shows.
+
+- **More useful health output**
+  - `:checkhealth wayfinder` now reports `ripgrep`, `git`, current-buffer LSP clients, resolved scope, and the active `performance` / `scope.mode` config instead of only basic load status.
+
+---
+
 ## Changes 04/30/2026 (v0.1.9)
 
 `fix(v0.1.9): harden layout borders and narrow-editor opens`

@@ -475,6 +475,8 @@ function M.render(session)
   local count_label = string.format("%d results", #session.visible_items)
   local loading_label = session.loading and "loading…" or nil
   local filter_label = session.filter ~= "" and ("/" .. session.filter) or nil
+  local selected_item = session.visible_items[session.selection_index]
+  local reason_label = selected_item and selected_item.reason or nil
   local separator = "  •  "
   local top_segments = {
     { text = " " .. mode_label, group = "WayfinderHeader" },
@@ -502,6 +504,10 @@ function M.render(session)
   if filter_label then
     table.insert(top_segments, { text = separator })
     table.insert(top_segments, { text = filter_label, group = "WayfinderDim" })
+  end
+  if reason_label then
+    table.insert(top_segments, { text = separator })
+    table.insert(top_segments, { text = reason_label, group = "WayfinderDim" })
   end
   if notice then
     table.insert(top_segments, { text = separator })

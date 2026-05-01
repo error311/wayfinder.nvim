@@ -369,6 +369,7 @@ local function grep_references(ctx, callback)
       badge = "TXT",
       detail = paths.display(path, ctx.project_root),
       secondary = paths.display(path, ctx.project_root),
+      reason = "plain text fallback",
       group = "Text Matches",
       icon = config.values.icons.refs,
     }

@@ -201,8 +201,11 @@ Quickfix export:
 
 - `Calls` shows LSP definitions and callers
 - `Refs` is split into `LSP References` and `Text Matches`
+- weak-source reasons now show up in the top bar for the current selection
 - `Tests` is heuristic and intentionally ranked below calls and refs
+- `Tests` can show a small heuristic reason like filename or symbol-text matching
 - `Git` shows recent commits touching the current file
+- `Git` can show a small file-touch reason while commit metadata stays in details
 
 ## Scope and Performance
 
@@ -232,6 +235,16 @@ Move the cursor onto `createUser`, then run `:Wayfinder`.
 More demo notes are in [demo/README.md](demo/README.md).
 
 ## Health
+
+`:checkhealth wayfinder` reports:
+
+- Neovim version
+- plugin load status
+- `ripgrep` availability for Text Matches
+- `git` availability for the Git facet
+- active LSP clients for the current buffer
+- resolved scope root for the current buffer
+- current `performance` and `scope.mode` config
 
 ```vim
 :checkhealth wayfinder

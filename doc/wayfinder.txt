@@ -10,6 +10,7 @@ CONTENTS                                                *wayfinder-contents*
 5. Configuration ....................................... |wayfinder-config|
 6. Result Types ........................................ |wayfinder-result-types|
 7. Demo ................................................ |wayfinder-demo|
+8. Health .............................................. |wayfinder-health|
 
 ==============================================================================
 1. Introduction                                         *wayfinder-intro*
@@ -248,12 +249,18 @@ Limits:
 
   Refs
       Split into LSP References and Text Matches.
+      Text Matches can surface a small plain-text fallback reason in the top
+      bar for the current selection.
 
   Tests
       Heuristic likely-test matches for the file or symbol.
+      Test matches can surface a small heuristic reason such as filename or
+      symbol text matching.
 
   Git
       Recent commits touching the current file.
+      Git selections can surface a small file-touch reason while commit
+      metadata stays in details.
 
 ==============================================================================
 7. Demo                                                  *wayfinder-demo*
@@ -269,5 +276,23 @@ Move onto |createUser| and run:
 >
   :Wayfinder
 <
+
+==============================================================================
+8. Health                                              *wayfinder-health*
+
+Run:
+>
+  :checkhealth wayfinder
+<
+
+Health output includes:
+
+  - Neovim version
+  - plugin load status
+  - ripgrep availability for Text Matches
+  - git availability for the Git facet
+  - active LSP clients for the current buffer
+  - resolved scope root for the current buffer
+  - current performance and scope.mode config
 
 vim:tw=78:ts=8:noet:ft=help:norl:

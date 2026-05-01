@@ -72,6 +72,7 @@ function M.collect(ctx, callback)
             badge = "GIT",
             detail = hash .. " • " .. when,
             secondary = paths.display(ctx.path, ctx.project_root),
+            reason = "recent commit touching current file",
             group = "Recent Commits",
             icon = config.values.icons.git,
             git = {

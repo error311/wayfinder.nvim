@@ -365,6 +365,7 @@ test("tests source finds likely tests", function()
     }, done)
   end, function(items)
     assert_ok(#items > 0, "expected likely tests")
+    assert_ok(type(items[1].reason) == "string" and items[1].reason ~= "", "expected test match reason")
   end, {
     message = "tests source did not finish",
   })
@@ -380,6 +381,7 @@ test("git source returns commits", function()
   end, function(items)
     assert_ok(#items > 0, "expected git commits")
     assert_ok(items[1].git and items[1].git.repo_root, "expected git repo metadata")
+    assert_ok(items[1].reason == "recent commit touching current file", "expected git reason")
   end, {
     message = "git source did not finish",
   })
@@ -431,6 +433,7 @@ test("lsp source falls back to grep references without lsp", function()
       return item.facet == "refs" and item.source == "grep"
     end, items)
     assert_ok(#grep_refs > 0, "expected grep fallback references")
+    assert_ok(grep_refs[1].reason == "plain text fallback", "expected grep fallback reason")
   end, {
     message = "grep fallback did not finish",
   })

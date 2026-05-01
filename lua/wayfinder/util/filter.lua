@@ -71,6 +71,7 @@ local function haystack(item)
   return table.concat({
     item.label or "",
     item.secondary or "",
+    item.reason or "",
     item.detail or "",
   }, "\n"):lower()
 end

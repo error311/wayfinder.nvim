@@ -37,21 +37,26 @@ local function score(path, ctx)
   local basename = paths.basename(ctx.path or ""):gsub("%..+$", "")
   local lower = path:lower()
   local symbol = ctx.symbol and ctx.symbol.text:lower() or nil
+  local reasons = {}
 
   if lower:match("test") or lower:match("spec") then
     score_value = score_value + 40
+    reasons[#reasons + 1] = "test/spec file"
   end
   if basename ~= "" and lower:find(basename:lower(), 1, true) then
     score_value = score_value + 35
+    reasons[#reasons + 1] = "filename match"
   end
   if symbol and lower:find(symbol, 1, true) then
     score_value = score_value + 20
+    reasons[#reasons + 1] = "symbol text match"
   end
   if lower:find("__tests__", 1, true) or lower:find("/tests/", 1, true) then
     score_value = score_value + 10
+    reasons[#reasons + 1] = "tests directory"
   end
 
-  return score_value
+  return score_value, reasons
 end
 
 function M.collect(ctx, callback)
@@ -61,7 +66,7 @@ function M.collect(ctx, callback)
 
     for _, path in ipairs(candidates) do
       if path ~= ctx.path then
-        local score_value = score(path, ctx)
+        local score_value, reasons = score(path, ctx)
         if score_value > 0 then
           table.insert(results, {
             id = items.item_id({ "test", path }),
@@ -77,6 +82,7 @@ function M.collect(ctx, callback)
             badge = "TEST",
             detail = paths.display(path, ctx.project_root),
             secondary = paths.display(path, ctx.project_root),
+            reason = reasons[1] or "heuristic match",
             group = "Likely Tests",
             icon = config.values.icons.tests,
           })

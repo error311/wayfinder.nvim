@@ -150,10 +150,19 @@ function M.rows(session)
       table.insert(highlights[row], { group = "WayfinderDim", start_col = badge_end - 1, end_col = badge_end })
     end
 
-    local secondary = item.secondary or item.detail or ""
-    if session.show_details and item.detail and item.detail ~= item.secondary then
-      secondary = string.format("%s  •  %s", item.secondary or "", item.detail)
-      secondary = secondary:gsub("^%s*•%s*", "")
+    local secondary_parts = {}
+    if item.secondary and item.secondary ~= "" then
+      secondary_parts[#secondary_parts + 1] = item.secondary
+    end
+    if session.show_details and item.detail and item.detail ~= "" then
+      local already_shown = item.detail == item.secondary
+      if not already_shown then
+        secondary_parts[#secondary_parts + 1] = item.detail
+      end
+    end
+    local secondary = table.concat(secondary_parts, "  •  ")
+    if secondary == "" then
+      secondary = item.detail or ""
     end
     secondary = item.source == "grep"
       and text.truncate_middle(secondary, math.max(list_width - 4, 1))
