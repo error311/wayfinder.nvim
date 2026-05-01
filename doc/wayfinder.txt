@@ -1,4 +1,4 @@
-*wayfinder.nvim*     Explore connected code paths from the current symbol or file
+*wayfinder* *wayfinder.nvim*     Explore connected code paths from the current symbol or file
 
 ==============================================================================
 CONTENTS                                                *wayfinder-contents*
