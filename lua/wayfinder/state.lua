@@ -1,8 +1,15 @@
 local M = {
   current = nil,
+  ui_suspended = false,
   cache = {},
   trail = {},
   trail_cursor = 1,
+  trail_persistence = {
+    active_name = nil,
+    project_root = nil,
+    detached = true,
+    dirty = false,
+  },
   ui = {
     border = nil,
     top = nil,
@@ -54,6 +61,64 @@ end
 
 function M.clear_cache()
   M.cache = {}
+end
+
+function M.trail_persistence_state()
+  return vim.deepcopy(M.trail_persistence)
+end
+
+function M.set_trail_persistence(opts)
+  opts = opts or {}
+
+  local current = M.trail_persistence
+  local function pick(key)
+    if opts[key] ~= nil then
+      return opts[key]
+    end
+    return current[key]
+  end
+
+  M.trail_persistence = {
+    active_name = pick("active_name"),
+    project_root = pick("project_root"),
+    detached = pick("detached"),
+    dirty = pick("dirty"),
+  }
+
+  return M.trail_persistence
+end
+
+function M.attach_saved_trail(name, opts)
+  opts = opts or {}
+
+  return M.set_trail_persistence({
+    active_name = name,
+    project_root = opts.project_root,
+    detached = false,
+    dirty = opts.dirty or false,
+  })
+end
+
+function M.detach_trail(opts)
+  opts = opts or {}
+
+  M.trail_persistence = {
+    active_name = nil,
+    project_root = nil,
+    detached = true,
+    dirty = opts.dirty or false,
+  }
+
+  return M.trail_persistence
+end
+
+function M.mark_trail_dirty(dirty)
+  M.trail_persistence.dirty = dirty ~= false
+  return M.trail_persistence
+end
+
+function M.reset_trail_persistence()
+  return M.detach_trail({ dirty = false })
 end
 
 function M.set_notice(text, ttl_ms)

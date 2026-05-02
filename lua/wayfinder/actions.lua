@@ -2,6 +2,7 @@ local layout = require("wayfinder.layout")
 local quickfix = require("wayfinder.util.quickfix")
 local state = require("wayfinder.state")
 local trail = require("wayfinder.trail")
+local trail_persistence = require("wayfinder.trail_persistence")
 local open = require("wayfinder.util.open")
 local facets = require("wayfinder.render.facets")
 
@@ -70,6 +71,202 @@ local function export_notice(session, message)
   else
     vim.notify(message, vim.log.levels.INFO)
   end
+end
+
+local function normalize_name(name)
+  if type(name) ~= "string" then
+    return nil
+  end
+
+  local trimmed = vim.trim(name)
+  if trimmed == "" then
+    return nil
+  end
+
+  return trimmed
+end
+
+local function persistence_notice(message)
+  export_notice(current(), message)
+end
+
+local function persistence_error_message(err, name)
+  if err == "empty" then
+    return "Wayfinder: Trail is empty"
+  end
+  if err == "missing_project_root" then
+    return "Wayfinder: Unable to resolve project root for Trail storage"
+  end
+  if err == "missing_name" then
+    return "Wayfinder: Trail name is required"
+  end
+  if err == "name_exists" then
+    return string.format("Wayfinder: Trail already exists: %s", name or "")
+  end
+  if err == "missing_trail" then
+    return string.format("Wayfinder: Saved Trail not found: %s", name or "")
+  end
+  if err == "invalid_json" then
+    return "Wayfinder: Saved Trail storage is invalid"
+  end
+  if err == "read_failed" then
+    return "Wayfinder: Unable to read saved Trail storage"
+  end
+  if err == "encode_failed" then
+    return "Wayfinder: Unable to encode Trail storage"
+  end
+  if err == "invalid_trail" then
+    return "Wayfinder: Saved Trail data is invalid"
+  end
+  if err == "no_saved_trails" then
+    return "Wayfinder: No saved Trails"
+  end
+  return "Wayfinder: Trail persistence failed"
+end
+
+local function persistence_warn(err, name)
+  vim.notify(persistence_error_message(err, name), vim.log.levels.WARN)
+end
+
+local function with_suspended_ui(start)
+  local session = current()
+  local suspended = session and layout.is_open()
+  local target_win = session and session.origin_win or vim.api.nvim_get_current_win()
+
+  local function resume()
+    if not suspended then
+      return
+    end
+
+    vim.schedule(function()
+      if state.current == session and not session.closed then
+        require("wayfinder").resume_session_ui()
+      else
+        state.ui_suspended = false
+      end
+    end)
+  end
+
+  if not suspended then
+    start(function() end)
+    return
+  end
+
+  state.ui_suspended = true
+  layout.close()
+  if target_win and vim.api.nvim_win_is_valid(target_win) then
+    pcall(vim.api.nvim_set_current_win, target_win)
+  end
+
+  vim.schedule(function()
+    start(resume)
+  end)
+end
+
+local function maybe_suspend_ui(opts, start)
+  opts = opts or {}
+  if opts.suspend == false then
+    start(function() end)
+    return
+  end
+
+  with_suspended_ui(start)
+end
+
+local function rerender_trail_state(opts)
+  local session = current()
+  if not session then
+    return
+  end
+
+  opts = opts or {}
+  if opts.reset_selection then
+    session.selection_id = nil
+    session.selection_index = 1
+  end
+  rerender()
+end
+
+local function select_saved_trail(prompt, callback, opts)
+  maybe_suspend_ui(opts, function(done)
+    local names, err = trail_persistence.list()
+    if not names then
+      persistence_warn(err)
+      done()
+      return
+    end
+
+    if #names == 0 then
+      persistence_notice("Wayfinder: No saved Trails")
+      done()
+      return
+    end
+
+    vim.ui.select(names, {
+      prompt = prompt,
+      format_item = function(name)
+        local markers = {}
+        if trail_persistence.active_name() == name then
+          markers[#markers + 1] = "active"
+        end
+        if #markers == 0 then
+          return name
+        end
+        return string.format("%s  (%s)", name, table.concat(markers, ", "))
+      end,
+    }, function(choice)
+      if not choice then
+        if opts and opts.on_cancel then
+          opts.on_cancel()
+        end
+        done()
+        return
+      end
+
+      callback(choice, done)
+    end)
+  end)
+end
+
+local function prompt_trail_name(prompt, default, callback, opts)
+  maybe_suspend_ui(opts, function(done)
+    vim.ui.input({
+      prompt = prompt,
+      default = default or "",
+    }, function(input)
+      local name = normalize_name(input)
+      if not name then
+        if opts and opts.on_cancel then
+          opts.on_cancel()
+        end
+        done()
+        return
+      end
+
+      callback(name, done)
+    end)
+  end)
+end
+
+local function confirm_overwrite(name, callback, opts)
+  maybe_suspend_ui(opts, function(done)
+    vim.ui.select({
+      "Overwrite",
+      "Cancel",
+    }, {
+      prompt = string.format("Trail '%s' already exists", name),
+    }, function(choice)
+      if choice ~= "Overwrite" then
+        if opts and opts.on_cancel then
+          opts.on_cancel()
+        end
+        done()
+        return
+      end
+
+      callback(done)
+    end)
+  end)
 end
 
 function M.select_next()
@@ -302,6 +499,209 @@ function M.clear_trail()
   else
     vim.notify("Cleared Trail", vim.log.levels.INFO)
   end
+end
+
+function M.trail_save(opts)
+  opts = opts or {}
+  local finish = opts.on_done or function() end
+  local active_name = trail_persistence.active_name()
+  if active_name then
+    local saved, err = trail_persistence.save_current(nil)
+    if not saved then
+      if err == "empty" then
+        persistence_notice(persistence_error_message(err))
+      else
+        persistence_warn(err, active_name)
+      end
+      finish()
+      return
+    end
+
+    rerender_trail_state()
+    persistence_notice(string.format("Saved Trail: %s", saved.name))
+    finish()
+    return
+  end
+
+  M.trail_save_as(opts)
+end
+
+function M.trail_save_as(opts)
+  opts = opts or {}
+  local finish = opts.on_done or function() end
+  local default_name = trail_persistence.active_name() or ""
+
+  prompt_trail_name("Save Trail as: ", default_name, function(name, done)
+    local saved, err = trail_persistence.save_current_as(name)
+    if not saved and err == "name_exists" then
+      confirm_overwrite(name, function(confirm_done)
+        local overwritten, overwrite_err = trail_persistence.save_current_as(name, { overwrite = true })
+        if not overwritten then
+          if overwrite_err == "empty" then
+            persistence_notice(persistence_error_message(overwrite_err))
+          else
+            persistence_warn(overwrite_err, name)
+          end
+          confirm_done()
+          done()
+          finish()
+          return
+        end
+
+        rerender_trail_state()
+        persistence_notice(string.format("Saved Trail: %s", overwritten.name))
+        confirm_done()
+        done()
+        finish()
+      end, { suspend = false, on_cancel = function()
+        done()
+        finish()
+      end })
+      return
+    end
+
+    if not saved then
+      if err == "empty" then
+        persistence_notice(persistence_error_message(err))
+      else
+        persistence_warn(err, name)
+      end
+      done()
+      finish()
+      return
+    end
+
+    rerender_trail_state()
+    persistence_notice(string.format("Saved Trail: %s", saved.name))
+    done()
+    finish()
+  end, { suspend = opts.suspend, on_cancel = finish })
+end
+
+function M.trail_load(opts)
+  opts = opts or {}
+  local finish = opts.on_done or function() end
+  select_saved_trail("Load Wayfinder Trail", function(name, done)
+    local loaded, err = trail_persistence.load(name)
+    if not loaded then
+      persistence_warn(err, name)
+      done()
+      finish()
+      return
+    end
+
+    rerender_trail_state({ reset_selection = current() and current().facet == "trail" })
+    persistence_notice(string.format("Loaded Trail: %s", loaded.name))
+    done()
+    finish()
+  end, { suspend = opts.suspend, on_cancel = finish })
+end
+
+local function cycle_saved_trail(delta)
+  local loaded, err = trail_persistence.cycle(delta)
+  if not loaded then
+    if err == "no_saved_trails" then
+      persistence_notice(persistence_error_message(err))
+    else
+      persistence_warn(err)
+    end
+    return
+  end
+
+  rerender_trail_state({ reset_selection = current() and current().facet == "trail" })
+  persistence_notice(string.format("Loaded Trail: %s", loaded.name))
+end
+
+function M.next_saved_trail()
+  cycle_saved_trail(1)
+end
+
+function M.prev_saved_trail()
+  cycle_saved_trail(-1)
+end
+
+function M.trail_delete(opts)
+  opts = opts or {}
+  local finish = opts.on_done or function() end
+  select_saved_trail("Delete Wayfinder Trail", function(name, done)
+    local updated, removed = trail_persistence.delete(name)
+    if not updated then
+      persistence_warn(removed, name)
+      done()
+      finish()
+      return
+    end
+
+    if not removed then
+      persistence_notice(string.format("Wayfinder: Trail not found: %s", name))
+      done()
+      finish()
+      return
+    end
+
+    rerender_trail_state()
+    persistence_notice(string.format("Deleted Trail: %s", name))
+    done()
+    finish()
+  end, { suspend = opts.suspend, on_cancel = finish })
+end
+
+function M.trail_rename(opts)
+  opts = opts or {}
+  local finish = opts.on_done or function() end
+  select_saved_trail("Rename Wayfinder Trail", function(old_name, select_done)
+    prompt_trail_name("Rename Trail to: ", old_name, function(new_name, input_done)
+      local renamed, err = trail_persistence.rename(old_name, new_name)
+      if not renamed then
+        if err == "name_exists" then
+          persistence_notice(persistence_error_message(err, new_name))
+        else
+          persistence_warn(err, old_name)
+        end
+        input_done()
+        select_done()
+        finish()
+        return
+      end
+
+      rerender_trail_state()
+      persistence_notice(string.format("Renamed Trail: %s", renamed.name))
+      input_done()
+      select_done()
+      finish()
+    end, { suspend = false, on_cancel = function()
+      select_done()
+      finish()
+    end })
+  end, { suspend = opts.suspend, on_cancel = finish })
+end
+
+function M.trail_menu()
+  with_suspended_ui(function(done)
+    vim.ui.select({
+      "Save Trail",
+      "Save Trail As",
+      "Load Trail",
+      "Rename Trail",
+      "Delete Trail",
+    }, {
+      prompt = "Wayfinder Trail menu",
+    }, function(choice)
+      if choice == "Save Trail" then
+        M.trail_save({ suspend = false, on_done = done })
+      elseif choice == "Save Trail As" then
+        M.trail_save_as({ suspend = false, on_done = done })
+      elseif choice == "Load Trail" then
+        M.trail_load({ suspend = false, on_done = done })
+      elseif choice == "Rename Trail" then
+        M.trail_rename({ suspend = false, on_done = done })
+      elseif choice == "Delete Trail" then
+        M.trail_delete({ suspend = false, on_done = done })
+      else
+        done()
+      end
+    end)
+  end)
 end
 
 function M.export_quickfix()

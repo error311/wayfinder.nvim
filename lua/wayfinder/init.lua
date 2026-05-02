@@ -187,6 +187,9 @@ local function keymaps()
       map("t", actions.open_tab)
       map("p", actions.pin)
       map("P", actions.open_trail)
+      map("S", actions.trail_menu)
+      map("[", actions.prev_saved_trail)
+      map("]", actions.next_saved_trail)
       map("x", actions.export_quickfix)
       map("dd", actions.remove_trail_item)
       map("da", actions.clear_trail)
@@ -272,6 +275,9 @@ local function update_session(session, source_name, source_items)
   }
   session.pending[source_name] = nil
   aggregate_items(session)
+  if state.ui_suspended then
+    return
+  end
   layout.render(session)
   keymaps()
   if layout.is_open() and not layout.interactive_window(vim.api.nvim_get_current_win()) then
@@ -374,6 +380,43 @@ function M.trail_show()
   end
 
   open_session("trail")
+end
+
+function M.trail_save()
+  actions.trail_save()
+end
+
+function M.trail_save_as()
+  actions.trail_save_as()
+end
+
+function M.trail_load()
+  actions.trail_load()
+end
+
+function M.trail_delete()
+  actions.trail_delete()
+end
+
+function M.trail_rename()
+  actions.trail_rename()
+end
+
+function M.resume_session_ui()
+  local session = state.current
+  if not session or session.closed then
+    state.ui_suspended = false
+    return
+  end
+
+  state.ui_suspended = false
+  if not layout.render(session) then
+    session.closed = true
+    state.current = nil
+    return
+  end
+  keymaps()
+  layout.focus_primary()
 end
 
 return M

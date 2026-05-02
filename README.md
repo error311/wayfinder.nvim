@@ -30,6 +30,7 @@ It opens as a centered 3-pane picker, loads sources progressively, and keeps the
 - Dense result list with badges and grouped headers
 - Syntax-highlighted preview
 - Trail facet for pinned breadcrumbs
+- Persistent named Trails per project
 - Async, cancelable LSP loading plus async tests and git loading
 - Local filter with negation and phrase matching
 - Jump actions
@@ -60,6 +61,14 @@ vim.keymap.set("n", "<leader>wf", "<Plug>(WayfinderOpen)", { desc = "Wayfinder" 
 
 Open it on a symbol for definitions, references, callers, likely tests, and recent commits.
 If there is no symbol under the cursor, it falls back to the current file.
+
+## Typical Flow
+
+1. Open Wayfinder on the current symbol or file.
+2. Move across `Calls`, `Refs`, `Tests`, `Git`, and `Trail`.
+3. Use preview to confirm the right match before jumping.
+4. Pin useful stops into Trail while exploring.
+5. Save or reload a Trail later if you want to keep that exploration path.
 
 ## Optional Setup
 
@@ -133,13 +142,26 @@ vim.keymap.set("n", "<leader>wts", "<Plug>(WayfinderTrailShow)", { desc = "Wayfi
 
 ## Commands
 
+Core:
+
 - `:Wayfinder`
 - `:WayfinderExportQuickfix`
 - `:WayfinderExportTrailQuickfix`
+
+Trail:
+
 - `:WayfinderTrailNext`
 - `:WayfinderTrailPrev`
 - `:WayfinderTrailOpen`
 - `:WayfinderTrailShow`
+- `:WayfinderTrailSave`
+- `:WayfinderTrailSaveAs`
+- `:WayfinderTrailLoad`
+- `:WayfinderTrailDelete`
+- `:WayfinderTrailRename`
+
+Mappings:
+
 - `<Plug>(WayfinderOpen)`
 - `<Plug>(WayfinderTrailNext)`
 - `<Plug>(WayfinderTrailPrev)`
@@ -161,6 +183,9 @@ vim.keymap.set("n", "<leader>wts", "<Plug>(WayfinderTrailShow)", { desc = "Wayfi
 - `t` open in tab
 - `p` pin into Trail
 - `P` open Trail immediately
+- `S` open Trail menu
+- `[` previous saved Trail
+- `]` next saved Trail
 - `x` export current facet to quickfix
 - `dd` remove pinned trail item
 - `da` clear Trail
@@ -171,19 +196,18 @@ vim.keymap.set("n", "<leader>wts", "<Plug>(WayfinderTrailShow)", { desc = "Wayfi
 - `q` close
 - mouse wheel scrolls results
 
-Filter examples:
+## Trail
 
-- `user` matches `user`
-- `user test` requires both terms
-- `user !spec` excludes matches containing `spec`
-- `"user service"` matches that exact phrase
-- `create !"git status"` excludes that exact phrase
+Trail is the working breadcrumb list you build while exploring.
 
-Pinning behavior:
+Core Trail actions:
 
-- the first `p` pins the current item
-- `P` opens the Trail facet explicitly
-- the top bar shows a short Trail hint when you pin an item, then keeps a steady Trail item count once Trail is non-empty
+- `p` pins the current item
+- `P` opens the Trail facet
+- `S` opens the Trail menu for save/load/rename/delete actions
+- `[` / `]` cycle through saved Trails for the current project
+- `dd` removes the selected Trail item
+- `da` clears the current Trail
 
 Trail commands outside Wayfinder:
 
@@ -191,6 +215,32 @@ Trail commands outside Wayfinder:
 - `:WayfinderTrailPrev` opens the previous Trail item
 - `:WayfinderTrailOpen` opens the current Trail item
 - `:WayfinderTrailShow` opens Wayfinder on the Trail facet
+
+Persistent named Trails:
+
+- saved Trails are project-scoped and stored under Neovim state, not in your repo
+- nothing persists automatically just because you pin items
+- if you never save a Trail, ordinary Trail behavior stays the same
+- `:WayfinderTrailSave` saves the current working Trail
+- `:WayfinderTrailSaveAs` saves the current working Trail under a different name
+- `:WayfinderTrailLoad` loads a saved Trail back into the current working Trail
+- `:WayfinderTrailRename` renames a saved Trail
+- `:WayfinderTrailDelete` deletes a saved Trail entry
+- once a saved Trail is loaded, `Save Trail` updates that same saved Trail and `Save Trail As` creates a named variant
+
+Top bar Trail states:
+
+- `Trail • unsaved • 3 items`
+- `Trail: auth bug • 3 items`
+- `Trail: auth bug • modified`
+
+Filter examples:
+
+- `user` matches `user`
+- `user test` requires both terms
+- `user !spec` excludes matches containing `spec`
+- `"user service"` matches that exact phrase
+- `create !"git status"` excludes that exact phrase
 
 Quickfix export:
 

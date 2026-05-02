@@ -18,6 +18,24 @@ local function set_cursor(index)
   state.trail_cursor = normalize_index(index, #state.trail)
 end
 
+local function mark_dirty(opts)
+  opts = opts or {}
+  if opts.dirty == false then
+    state.mark_trail_dirty(false)
+    return
+  end
+
+  state.mark_trail_dirty(true)
+end
+
+local function normalize_pinned_item(item)
+  local pinned = vim.deepcopy(item or {})
+  pinned.facet = "trail"
+  pinned.pinned = true
+  pinned.group = "Pinned Trail"
+  return pinned
+end
+
 function M.items()
   return vim.deepcopy(state.trail)
 end
@@ -48,13 +66,25 @@ function M.pin(item)
     return false
   end
 
-  local pinned = vim.deepcopy(item)
-  pinned.facet = "trail"
-  pinned.pinned = true
-  pinned.group = "Pinned Trail"
+  local pinned = normalize_pinned_item(item)
   table.insert(state.trail, pinned)
   set_cursor(#state.trail)
+  mark_dirty()
   return true
+end
+
+function M.replace(items, opts)
+  opts = opts or {}
+
+  state.trail = vim.tbl_map(normalize_pinned_item, items or {})
+  if #state.trail == 0 then
+    state.trail_cursor = 1
+    mark_dirty(opts)
+    return
+  end
+
+  set_cursor(opts.cursor or 1)
+  mark_dirty(opts)
 end
 
 function M.remove(item_id)
@@ -62,15 +92,17 @@ function M.remove(item_id)
     if item.id == item_id then
       table.remove(state.trail, index)
       state.trail_cursor = math.min(state.trail_cursor, math.max(#state.trail, 1))
+      mark_dirty()
       return true
     end
   end
   return false
 end
 
-function M.clear()
+function M.clear(opts)
   state.trail = {}
   state.trail_cursor = 1
+  mark_dirty(opts)
 end
 
 function M.cursor()

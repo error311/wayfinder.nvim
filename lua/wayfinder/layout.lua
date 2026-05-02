@@ -470,14 +470,32 @@ function M.render(session)
   local subject = session.mode == "symbol" and session.subject or vim.fs.basename(session.path)
   local source_file = session.mode == "symbol" and paths.display(session.path, session.project_root or session.cwd) or nil
   local scope_label = session.scope and session.scope.mode ~= "project" and session.scope.label or nil
+  local separator = "  •  "
+  local trail_meta = state.trail_persistence_state()
+  local attached_here = trail_meta.project_root ~= nil and session.project_root ~= nil
+    and trail_meta.project_root == session.project_root
+  local detached_here = trail_meta.detached or not attached_here
   local trail_count = session.counts and session.counts.trail or 0
-  local trail_label = trail_count > 0 and string.format("Trail • %d item%s", trail_count, trail_count == 1 and "" or "s") or nil
+  local trail_label = nil
+  if attached_here and trail_meta.active_name then
+    trail_label = string.format("Trail: %s", trail_meta.active_name)
+    if trail_meta.dirty then
+      trail_label = trail_label .. separator .. "modified"
+    elseif trail_count > 0 then
+      trail_label = trail_label .. separator .. string.format("%d item%s", trail_count, trail_count == 1 and "" or "s")
+    end
+  elseif trail_count > 0 then
+    trail_label = "Trail"
+    if detached_here then
+      trail_label = trail_label .. separator .. "unsaved"
+    end
+    trail_label = trail_label .. separator .. string.format("%d item%s", trail_count, trail_count == 1 and "" or "s")
+  end
   local count_label = string.format("%d results", #session.visible_items)
   local loading_label = session.loading and "loading…" or nil
   local filter_label = session.filter ~= "" and ("/" .. session.filter) or nil
   local selected_item = session.visible_items[session.selection_index]
   local reason_label = selected_item and selected_item.reason or nil
-  local separator = "  •  "
   local top_segments = {
     { text = " " .. mode_label, group = "WayfinderHeader" },
     { text = separator },
@@ -556,7 +574,7 @@ function M.render(session)
 
   local bottom_lines = {
     " <CR> jump   j/k move   h/l facets   <Tab>/<S-Tab> cycle   gg/G ends   <C-u>/<C-d> page ",
-    " p pin   P trail   x export   dd remove   da clear   D details   / filter   q close ",
+    " p pin   P trail   S trail menu   [] saved trails   x export   dd remove   da clear   D details   / filter   q close ",
   }
   set_lines(state.ui.bottom_buf, bottom_lines)
   vim.api.nvim_buf_clear_namespace(state.ui.bottom_buf, highlight_ns, 0, -1)
@@ -575,7 +593,7 @@ function M.render(session)
     state.ui.bottom_buf,
     1,
     bottom_lines[2],
-    { "p", "P", "x", "dd", "da", "D", "/", "q" },
+    { "p", "P", "S", "[", "]", "x", "dd", "da", "D", "/", "q" },
     "WayfinderHeader",
     200
   )

@@ -68,6 +68,26 @@ If no symbol is detected under the cursor, it falls back to the current file.
 :WayfinderTrailShow
                 Open Wayfinder on the Trail facet.
 
+                                               *:WayfinderTrailSave*
+:WayfinderTrailSave
+                Save the current working Trail.
+
+                                             *:WayfinderTrailSaveAs*
+:WayfinderTrailSaveAs
+                Save the current working Trail under a different name.
+
+                                               *:WayfinderTrailLoad*
+:WayfinderTrailLoad
+                Load a saved Trail.
+
+                                             *:WayfinderTrailDelete*
+:WayfinderTrailDelete
+                Delete a saved Trail.
+
+                                             *:WayfinderTrailRename*
+:WayfinderTrailRename
+                Rename a saved Trail.
+
                                                    *<Plug>(WayfinderOpen)*
 <Plug>(WayfinderOpen)
                 Mapping target to open Wayfinder.
@@ -115,6 +135,9 @@ Example mappings:
   t          Open in tab
   p          Pin current item into Trail
   P          Open Trail
+  S          Open Trail menu
+  [          Previous saved Trail
+  ]          Next saved Trail
   x          Export current facet to quickfix
   dd         Remove current Trail item
   da         Clear Trail
@@ -154,6 +177,48 @@ Trail commands work outside the Wayfinder UI.
 
   :WayfinderTrailShow
       Open Wayfinder on the Trail facet.
+
+  :WayfinderTrailSave
+      Save the current working Trail.
+
+  :WayfinderTrailSaveAs
+      Save the current working Trail under a different name.
+
+  :WayfinderTrailLoad
+      Load a saved Trail into the current working Trail.
+
+  :WayfinderTrailDelete
+      Delete a saved Trail entry.
+
+  :WayfinderTrailRename
+      Rename a saved Trail entry.
+
+Persistent named Trails are explicit:
+
+  - pinning items does not automatically persist them
+  - if you never save a Trail, ordinary Trail behavior stays the same
+  - saved Trails are project-scoped and stored under Neovim state, not inside
+    the repo
+
+Inside Wayfinder:
+
+  p
+      Pin the current item.
+
+  P
+      Open the current working Trail.
+
+  S
+      Open the Trail menu for save/load/rename/delete actions.
+
+  [ / ]
+      Cycle through saved Trails for the current project.
+
+Top bar Trail states can look like:
+
+  Trail • unsaved • 3 items
+  Trail: auth bug • 3 items
+  Trail: auth bug • modified
 
 If Trail is empty, Wayfinder shows:
 

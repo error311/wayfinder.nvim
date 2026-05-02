@@ -1,5 +1,65 @@
 # Changelog
 
+## Changes 05/02/2026 (v0.2.0)
+
+`release(v0.2.0): add persistent named Trails per project`
+
+**Commit message**
+
+```text
+release(v0.2.0): add persistent named Trails per project
+
+- trail(save): add save/save-as/load/rename/delete support for named Trails scoped to the current project
+- trail(ui): add saved/unsaved Trail state in the top bar and an in-picker S Trail menu
+- trail(store): persist Trail data under stdpath("state") without changing normal unsaved Trail behavior
+```
+
+**Added**
+
+- **Persistent named Trails per project**
+  - Added explicit save, save-as, load, rename, and delete support for named Trails scoped to the current project.
+  - Saved Trails live under Neovim state instead of inside the repo.
+  - If you never save a Trail, ordinary Trail behavior stays the same.
+
+- **Trail persistence commands**
+  - Added `:WayfinderTrailSave`
+  - Added `:WayfinderTrailSaveAs`
+  - Added `:WayfinderTrailLoad`
+  - Added `:WayfinderTrailDelete`
+  - Added `:WayfinderTrailRename`
+
+- **In-picker Trail menu**
+  - Added `S` inside Wayfinder to open a small Trail menu for save/load/rename/delete actions without introducing a second management UI.
+
+- **Saved Trail cycling**
+  - Added `[` and `]` inside Wayfinder to cycle through saved Trails for the current project without reopening the Trail menu.
+
+**Changed**
+
+- **Top bar Trail state**
+  - The existing Trail status area now reflects saved and unsaved working Trail state.
+  - Examples include:
+    - `Trail • unsaved • 3 items`
+    - `Trail: auth bug • 3 items`
+    - `Trail: auth bug • modified`
+
+- **Explicit persistence semantics**
+  - Trail persistence is opt-in by action, not automatic.
+  - Pinning items does not auto-save them.
+  - Opening Wayfinder does not auto-restore a saved Trail in this first pass.
+
+- **Persistence flow polish**
+  - Save/load/rename/delete actions now suspend and restore the current Wayfinder session cleanly around `vim.ui.select` and `vim.ui.input` prompts so prompt UIs do not appear behind the picker.
+
+- **Persistence storage and attachment safety**
+  - Saved Trail attachment is now scoped to the current project, so `Save Trail` only reuses an active saved name inside the same repo.
+  - The persisted `trails` JSON shape now stays stable even when deleting the last saved Trail.
+
+- **Test harness organization**
+  - Split the growing headless test harness into shared support plus grouped Trail, persistence, UI, filter, and source suites while keeping the same coverage.
+
+---
+
 ## Changes 05/01/2026 (v0.1.10)
 
 `release(v0.1.10): add compact match reasons for weaker result sources`
