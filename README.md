@@ -13,7 +13,9 @@ From the current symbol or file, Wayfinder gathers the most relevant nearby code
 - likely tests
 - recent commits
 
-It opens as a centered 3-pane picker, loads sources progressively, and keeps the screen focused on facets, rows, badges, previews, and a Trail you can keep.
+It opens as a centered 3-pane picker, loads sources progressively, and keeps the screen focused on facets, rows, badges, previews, and a Trail you can actually keep.
+
+Pin useful stops into Trail while you explore, then save that Trail per project and reload it later when you want the same path back.
 
 ![wayfinder motion](docs/media/wayfinder.gif)
 
