@@ -31,6 +31,7 @@ Pin useful stops into Trail while you explore, then save that Trail per project 
 - Facet rail with counts
 - Dense result list with badges and grouped headers
 - Syntax-highlighted preview
+- Preview header with project-relative file context and line range
 - Trail facet for pinned breadcrumbs
 - Persistent named Trails per project
 - Async, cancelable LSP loading plus async tests and git loading
@@ -211,6 +212,8 @@ Core Trail actions:
 - `dd` removes the selected Trail item
 - `da` clears the current Trail
 
+Facet hopping within one open Wayfinder session remembers the last selected item per facet when it still exists.
+
 Trail commands outside Wayfinder:
 
 - `:WayfinderTrailNext` opens the next Trail item
@@ -232,9 +235,10 @@ Persistent named Trails:
 
 Top bar Trail states:
 
-- `Trail • unsaved • 3 items`
-- `Trail: auth bug • 3 items`
-- `Trail: auth bug • modified`
+- `Trail (2 saved)`
+- `Trail (2 saved) • unsaved`
+- `Trail (3 saved): auth bug`
+- `Trail (3 saved): auth bug • modified`
 
 Filter examples:
 
@@ -296,6 +300,9 @@ More demo notes are in [demo/README.md](demo/README.md).
 - `git` availability for the Git facet
 - active LSP clients for the current buffer
 - resolved scope root for the current buffer
+- saved Trail storage root
+- saved Trail storage file for the current project
+- saved Trail count for the current project
 - current `performance` and `scope.mode` config
 
 ```vim

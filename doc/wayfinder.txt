@@ -214,11 +214,15 @@ Inside Wayfinder:
   [ / ]
       Cycle through saved Trails for the current project.
 
+Facet switches remember the last selected item per facet for the current open
+Wayfinder session when that item still exists.
+
 Top bar Trail states can look like:
 
-  Trail • unsaved • 3 items
-  Trail: auth bug • 3 items
-  Trail: auth bug • modified
+  Trail (2 saved)
+  Trail (2 saved) • unsaved
+  Trail (3 saved): auth bug
+  Trail (3 saved): auth bug • modified
 
 If Trail is empty, Wayfinder shows:
 
@@ -358,6 +362,9 @@ Health output includes:
   - git availability for the Git facet
   - active LSP clients for the current buffer
   - resolved scope root for the current buffer
+  - saved Trail storage root
+  - saved Trail storage file for the current project
+  - saved Trail count for the current project
   - current performance and scope.mode config
 
 vim:tw=78:ts=8:noet:ft=help:norl:

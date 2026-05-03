@@ -17,6 +17,22 @@ local sources = {
 
 local M = {}
 
+local function remember_facet_selection(session)
+  if not session or not session.facet then
+    return
+  end
+
+  session.facet_memory = session.facet_memory or {}
+  local remembered = session.facet_memory[session.facet] or {}
+  if session.selection_id then
+    remembered.id = session.selection_id
+  end
+  if session.selection_index then
+    remembered.index = session.selection_index
+  end
+  session.facet_memory[session.facet] = remembered
+end
+
 local function cancel_session(session)
   if not session or session.closed then
     return
@@ -133,6 +149,7 @@ local function refresh_visible(session)
     for index, item in ipairs(session.visible_items) do
       if item.id == session.selection_id then
         session.selection_index = index
+        remember_facet_selection(session)
         return
       end
     end
@@ -140,6 +157,7 @@ local function refresh_visible(session)
 
   session.selection_index = math.min(session.selection_index or 1, #session.visible_items)
   session.selection_id = session.visible_items[session.selection_index].id
+  remember_facet_selection(session)
 end
 
 local function aggregate_items(session)
@@ -226,6 +244,7 @@ local function create_session()
     filter = "",
     selection_index = 1,
     selection_id = nil,
+    facet_memory = {},
     show_details = false,
     closed = false,
     loading = true,
@@ -249,6 +268,10 @@ local function create_session()
 
   function session:refresh_visible()
     refresh_visible(self)
+  end
+
+  function session:remember_facet_selection()
+    remember_facet_selection(self)
   end
 
   function session:reload()

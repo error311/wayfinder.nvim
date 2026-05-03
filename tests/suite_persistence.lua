@@ -224,6 +224,27 @@ test("trail persistence saves current Trail and reuses active saved name", funct
   assert_ok(#updated.items == 3, "expected active saved name reuse on save")
 end)
 
+test("trail persistence reports saved Trail count for the current project", function()
+  -- Guards the small top-bar summary path so saved Trail counts can be shown without loading full entries.
+  local state_root = vim.fs.normalize(vim.fn.tempname())
+  local project_root = git_fixture_root
+
+  assert(trail_store.set(project_root, {
+    name = "auth bug",
+    items = { { id = "trail-a", label = "trail a", path = project_root .. "/src/user_service.ts", lnum = 1, col = 1 } },
+  }, { state_root = state_root }))
+  assert(trail_store.set(project_root, {
+    name = "refactor targets",
+    items = { { id = "trail-b", label = "trail b", path = project_root .. "/tests/user_service_test.ts", lnum = 1, col = 1 } },
+  }, { state_root = state_root }))
+
+  local count = assert(trail_persistence.saved_count({
+    project_root = project_root,
+    state_root = state_root,
+  }))
+  assert_ok(count == 2, "expected saved Trail count for project")
+end)
+
 test("trail persistence save as refuses duplicate saved names", function()
   -- Guards explicit naming semantics so Save As does not silently overwrite another saved Trail.
   local state_root = vim.fs.normalize(vim.fn.tempname())

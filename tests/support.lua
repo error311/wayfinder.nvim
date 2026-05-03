@@ -8,6 +8,7 @@ vim.notify = function() end
 local M = {}
 
 M.wayfinder = require("wayfinder")
+M.actions = require("wayfinder.actions")
 M.state = require("wayfinder.state")
 M.layout = require("wayfinder.layout")
 M.trail = require("wayfinder.trail")

@@ -3,9 +3,11 @@ local t = require("support")
 local test = t.test
 local assert_ok = t.assert_ok
 local wayfinder = t.wayfinder
+local actions = t.actions
 local state = t.state
 local layout = t.layout
 local trail = t.trail
+local trail_persistence = t.trail_persistence
 local fixture_root = t.fixture_root
 local open_typescript = t.open_typescript
 
@@ -73,4 +75,125 @@ test("wayfinder exits cleanly when the editor is too small", function()
 
   assert_ok(ok, err or "expected Wayfinder to fail gracefully in a small editor")
   assert_ok(state.current == nil, "small editor open should not leave an active Wayfinder session")
+end)
+
+test("facet switches restore the last selected item within the current session", function()
+  -- Guards per-facet selection memory so hopping between facets feels stable without persisting across new opens.
+  local saved_render = layout.render
+  local saved_focus = layout.focus_primary
+  ---@diagnostic disable-next-line: duplicate-set-field
+  layout.render = function() end
+  ---@diagnostic disable-next-line: duplicate-set-field
+  layout.focus_primary = function() end
+
+  state.current = {
+    facet = "refs",
+    auto_facet_pending = false,
+    filter = "",
+    selection_index = 2,
+    selection_id = "ref-2",
+    facet_memory = {
+      refs = { id = "ref-2", index = 2 },
+    },
+    visible_items = {
+      { id = "ref-1", facet = "refs", label = "ref one" },
+      { id = "ref-2", facet = "refs", label = "ref two" },
+    },
+    remember_facet_selection = function(self)
+      self.facet_memory = self.facet_memory or {}
+      self.facet_memory[self.facet] = {
+        id = self.selection_id,
+        index = self.selection_index,
+      }
+    end,
+    refresh_visible = function(self)
+      if self.facet == "tests" then
+        self.visible_items = {
+          { id = "test-1", facet = "tests", label = "test one" },
+          { id = "test-2", facet = "tests", label = "test two" },
+        }
+      else
+        self.visible_items = {
+          { id = "ref-1", facet = "refs", label = "ref one" },
+          { id = "ref-2", facet = "refs", label = "ref two" },
+        }
+      end
+
+      if self.selection_id then
+        for index, item in ipairs(self.visible_items) do
+          if item.id == self.selection_id then
+            self.selection_index = index
+            self:remember_facet_selection()
+            return
+          end
+        end
+      end
+
+      self.selection_index = math.min(self.selection_index or 1, #self.visible_items)
+      self.selection_id = self.visible_items[self.selection_index].id
+      self:remember_facet_selection()
+    end,
+  }
+
+  actions.next_facet()
+  assert_ok(state.current.facet == "tests", "expected switch into tests facet")
+  assert_ok(state.current.selection_id == "test-1", "expected new facet to start at first visible item")
+
+  actions.select_next()
+  assert_ok(state.current.selection_id == "test-2", "expected test facet selection to move")
+
+  actions.prev_facet()
+  assert_ok(state.current.facet == "refs", "expected switch back into refs facet")
+  assert_ok(state.current.selection_id == "ref-2", "expected refs facet to restore its previous selection")
+  assert_ok(state.current.selection_index == 2, "expected refs facet to restore its previous index")
+
+  layout.render = saved_render
+  layout.focus_primary = saved_focus
+  state.current = nil
+end)
+
+test("top bar shows saved Trail count even before the working Trail has items", function()
+  -- Guards the saved-Trail affordance so users can discover project Trails before building a new working Trail.
+  local saved_count = trail_persistence.saved_count
+  ---@diagnostic disable-next-line: duplicate-set-field
+  trail_persistence.saved_count = function()
+    return 2
+  end
+
+  local session = {
+    mode = "symbol",
+    subject = "createUser",
+    path = fixture_root .. "/src/user_service.ts",
+    project_root = fixture_root,
+    cwd = fixture_root,
+    scope = { mode = "project", label = nil },
+    facet = "calls",
+    filter = "",
+    selection_index = 1,
+    selection_id = nil,
+    visible_items = {},
+    counts = {
+      all = 0,
+      calls = 0,
+      refs = 0,
+      tests = 0,
+      git = 0,
+      trail = 0,
+    },
+    loading = false,
+    show_details = false,
+    row_actions = {},
+    list_line_count = 0,
+  }
+
+  state.current = session
+  state.reset_trail_persistence()
+  layout.render(session)
+
+  local top_lines = vim.api.nvim_buf_get_lines(state.ui.top_buf, 0, -1, false)
+  assert_ok(string.find(top_lines[1] or "", "Trail %(2 saved%)", 1) ~= nil, "expected saved Trail count in top bar")
+
+  layout.close()
+  trail_persistence.saved_count = saved_count
+  state.current = nil
 end)

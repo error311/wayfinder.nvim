@@ -36,6 +36,9 @@ local function set_selection(session, index, opts)
   end
 
   session.selection_id = session.visible_items[session.selection_index].id
+  if session.remember_facet_selection then
+    session:remember_facet_selection()
+  end
 end
 
 local function rerender()
@@ -52,10 +55,15 @@ local function open_facet(session, facet)
     return
   end
 
+  if session.remember_facet_selection then
+    session:remember_facet_selection()
+  end
+
   session.auto_facet_pending = false
   session.facet = facet
-  session.selection_id = nil
-  session.selection_index = 1
+  local remembered = session.facet_memory and session.facet_memory[facet] or nil
+  session.selection_id = remembered and remembered.id or nil
+  session.selection_index = remembered and remembered.index or 1
 end
 
 local function selection_item()
@@ -377,9 +385,7 @@ function M.select_item_under_cursor()
   if area == "facet" then
     local facet = facets.rows(session)[line]
     if facet and facet.key then
-      session.facet = facet.key
-      session.selection_id = nil
-      session.selection_index = 1
+      open_facet(session, facet.key)
       rerender()
     end
     return

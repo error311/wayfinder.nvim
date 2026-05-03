@@ -63,11 +63,25 @@ local function preview_header(session, item)
 
   local display_path = paths.display(item.path, session.project_root or session.cwd)
   local filename = vim.fs.basename(item.path or display_path)
+  local suffix = ""
+  if item.git and item.git.hash then
+    suffix = "  @" .. string.sub(item.git.hash, 1, 7)
+  elseif item.preview_range and item.preview_range.start and item.preview_range["end"] then
+    local start_line = item.preview_range.start
+    local end_line = item.preview_range["end"]
+    if start_line == end_line then
+      suffix = string.format("  :%d", start_line)
+    else
+      suffix = string.format("  :%d-%d", start_line, end_line)
+    end
+  elseif item.lnum then
+    suffix = string.format("  :%d", item.lnum)
+  end
   local width = state.ui.preview and vim.api.nvim_win_is_valid(state.ui.preview)
       and math.max(vim.api.nvim_win_get_width(state.ui.preview) - 1, 1)
     or 80
   return {
-    line = " " .. text.truncate_middle(display_path, width - 1),
+    line = " " .. text.truncate_middle(display_path .. suffix, width - 1),
     filename = filename,
   }
 end
@@ -214,12 +228,20 @@ end
 function M.render(session, winid, item)
   ensure_buffer()
   if not item then
-    render_lines(session, nil, "", { "  Pick an item to preview" })
+    render_lines(session, nil, "", {
+      "  Pick an item to preview",
+      "",
+      "  Move through the list to update the preview.",
+    })
     return
   end
 
   if item.source == "git" and item.git then
-    render_lines(session, item, "", { "  Loading git preview…" })
+    render_lines(session, item, "", {
+      "  Loading git preview…",
+      "",
+      "  Wayfinder is fetching the selected revision.",
+    })
     render_git_preview(session, item)
     return
   end

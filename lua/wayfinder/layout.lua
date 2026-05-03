@@ -3,6 +3,7 @@ local state = require("wayfinder.state")
 local facets = require("wayfinder.render.facets")
 local list = require("wayfinder.render.list")
 local preview = require("wayfinder.render.preview")
+local trail_persistence = require("wayfinder.trail_persistence")
 local debounce = require("wayfinder.util.debounce")
 local paths = require("wayfinder.util.paths")
 
@@ -188,6 +189,10 @@ local function resolve_dimensions()
   local min_list_width = 24
   local min_preview_width = 18
   local min_body_height = 4
+  local min_columns = min_facet_width + min_list_width + min_preview_width + 6
+  local min_lines = header_height + footer_height + min_body_height + 2
+  local required_columns = math.ceil(min_columns / config.values.layout.width)
+  local required_lines = math.ceil(min_lines / config.values.layout.height)
 
   local available_width = width - 6
   local facet_width = math.min(
@@ -214,9 +219,11 @@ local function resolve_dimensions()
 
   if preview_width < min_preview_width or body_height < min_body_height then
     return nil, string.format(
-      "Wayfinder: editor too small (%dx%d). Need enough room for the 3-pane layout.",
+      "Wayfinder: editor too small (%dx%d). Need about %dx%d for the 3-pane layout.",
       vim.o.columns,
-      vim.o.lines
+      vim.o.lines,
+      required_columns,
+      required_lines
     )
   end
 
@@ -476,20 +483,27 @@ function M.render(session)
     and trail_meta.project_root == session.project_root
   local detached_here = trail_meta.detached or not attached_here
   local trail_count = session.counts and session.counts.trail or 0
+  local saved_trail_count = nil
+  if session.project_root then
+    saved_trail_count = trail_persistence.saved_count({ project_root = session.project_root })
+  end
+  local trail_prefix = "Trail"
+  if saved_trail_count and saved_trail_count > 0 then
+    trail_prefix = string.format("Trail (%d saved)", saved_trail_count)
+  end
   local trail_label = nil
   if attached_here and trail_meta.active_name then
-    trail_label = string.format("Trail: %s", trail_meta.active_name)
+    trail_label = string.format("%s: %s", trail_prefix, trail_meta.active_name)
     if trail_meta.dirty then
       trail_label = trail_label .. separator .. "modified"
-    elseif trail_count > 0 then
-      trail_label = trail_label .. separator .. string.format("%d item%s", trail_count, trail_count == 1 and "" or "s")
     end
   elseif trail_count > 0 then
-    trail_label = "Trail"
+    trail_label = trail_prefix
     if detached_here then
       trail_label = trail_label .. separator .. "unsaved"
     end
-    trail_label = trail_label .. separator .. string.format("%d item%s", trail_count, trail_count == 1 and "" or "s")
+  elseif saved_trail_count and saved_trail_count > 0 then
+    trail_label = string.format("Trail (%d saved)", saved_trail_count)
   end
   local count_label = string.format("%d results", #session.visible_items)
   local loading_label = session.loading and "loading…" or nil

@@ -1,6 +1,7 @@
 local paths = require("wayfinder.util.paths")
 
 local M = {}
+local project_cache = {}
 
 local function normalize_project_root(project_root)
   return paths.normalize(project_root)
@@ -29,6 +30,35 @@ local function storage_file(project_root, opts)
 
   local digest = vim.fn.sha256(root)
   return vim.fs.joinpath(storage_root(opts), digest .. ".json")
+end
+
+local function stat_signature(stat)
+  if not stat then
+    return nil
+  end
+
+  return table.concat({
+    tostring(stat.size or 0),
+    tostring(stat.mtime and stat.mtime.sec or 0),
+    tostring(stat.mtime and stat.mtime.nsec or 0),
+  }, ":")
+end
+
+local function cache_get(path, stat)
+  local cached = project_cache[path]
+  local signature = stat_signature(stat)
+  if not cached or cached.signature ~= signature then
+    return nil
+  end
+
+  return vim.deepcopy(cached.data)
+end
+
+local function cache_set(path, stat, data)
+  project_cache[path] = {
+    signature = stat_signature(stat),
+    data = vim.deepcopy(data),
+  }
 end
 
 function M.normalize_item(item)
@@ -135,8 +165,17 @@ function M.read_project(project_root, opts)
   end
 
   local path = storage_file(root, opts)
-  if not path or vim.uv.fs_stat(path) == nil then
+  local stat = path and vim.uv.fs_stat(path) or nil
+  if not path or stat == nil then
+    if path then
+      project_cache[path] = nil
+    end
     return default_data(root)
+  end
+
+  local cached = cache_get(path, stat)
+  if cached then
+    return cached
   end
 
   local content, read_err = read_file(path)
@@ -149,7 +188,9 @@ function M.read_project(project_root, opts)
     return nil, "invalid_json"
   end
 
-  return normalize_data(root, decoded)
+  local normalized = normalize_data(root, decoded)
+  cache_set(path, stat, normalized)
+  return vim.deepcopy(normalized)
 end
 
 local function encode_project_data(data)
@@ -181,6 +222,11 @@ function M.write_project(project_root, data, opts)
     return nil, write_err
   end
 
+  local stat = vim.uv.fs_stat(path)
+  if stat then
+    cache_set(path, stat, normalized)
+  end
+
   return normalized
 end
 
@@ -193,6 +239,15 @@ function M.list(project_root, opts)
   local names = vim.tbl_keys(data.trails)
   table.sort(names)
   return names
+end
+
+function M.count(project_root, opts)
+  local names, err = M.list(project_root, opts)
+  if not names then
+    return nil, err
+  end
+
+  return #names
 end
 
 function M.get(project_root, name, opts)

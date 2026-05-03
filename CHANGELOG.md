@@ -1,5 +1,46 @@
 # Changelog
 
+## Changes 05/02/2026 (v0.2.1)
+
+`fix(v0.2.1): polish saved Trail status and preview context`
+
+**Commit message**
+
+```text
+fix(v0.2.1): polish saved Trail status and preview context
+
+- ui(topbar): show saved Trail counts in the existing Trail status area
+- health: report saved Trail storage root/file details and current-project saved counts
+- preview(header): show clearer project-relative file context with line ranges in the preview header
+- layout(size): make narrow-editor fallback warnings more specific about the space the 3-pane layout needs
+```
+
+**Changed**
+
+- **Saved Trail count in the top bar**
+  - The existing Trail status area now includes the current project's saved Trail count when it is relevant.
+  - Examples include:
+    - `Trail (2 saved)`
+    - `Trail (2 saved) • unsaved`
+    - `Trail (3 saved): auth bug`
+    - `Trail (3 saved): auth bug • modified`
+
+- **Preview header context**
+  - The preview header now keeps project-relative file context visible while also showing the selected line or line range.
+  - Git previews can show a short commit hash in that same header instead of using a separate label row.
+
+- **Healthcheck Trail diagnostics**
+  - `:checkhealth wayfinder` now reports the saved Trail storage root, the current project's saved Trail storage file, and the saved Trail count for the current project.
+
+- **Cleaner narrow-window fallback**
+  - When the editor is too small for Wayfinder's centered 3-pane layout, the warning now includes an approximate minimum editor size instead of only saying that the window is too small.
+
+- **Facet selection memory**
+  - While Wayfinder stays open, moving away from a facet and coming back now restores the last selected item for that facet when it still exists.
+  - A fresh `:Wayfinder` open still starts clean at the top as before.
+
+---
+
 ## Changes 05/02/2026 (v0.2.0)
 
 `release(v0.2.0): add persistent named Trails per project`
