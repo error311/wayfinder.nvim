@@ -1,6 +1,6 @@
 # Changelog
 
-## Changes 05/02/2026 (v0.2.1)
+## Changes 05/03/2026 (v0.2.1)
 
 `fix(v0.2.1): polish saved Trail status and preview context`
 
