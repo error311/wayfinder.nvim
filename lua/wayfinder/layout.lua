@@ -24,7 +24,11 @@ local function interactive_windows()
 end
 
 local preview_debounced = debounce.new(config.values.preview_debounce_ms, function(session)
-  if state.current ~= session or not state.ui.preview or not vim.api.nvim_win_is_valid(state.ui.preview) then
+  if
+    state.current ~= session
+    or not state.ui.preview
+    or not vim.api.nvim_win_is_valid(state.ui.preview)
+  then
     return
   end
 
@@ -115,7 +119,16 @@ end
 
 local function clear_ui()
   closing = true
-  for _, key in ipairs({ "border", "top", "facet", "facet_divider", "list", "list_divider", "preview", "bottom" }) do
+  for _, key in ipairs({
+    "border",
+    "top",
+    "facet",
+    "facet_divider",
+    "list",
+    "list_divider",
+    "preview",
+    "bottom",
+  }) do
     local winid = state.ui[key]
     if winid and vim.api.nvim_win_is_valid(winid) then
       pcall(vim.api.nvim_win_close, winid, true)
@@ -123,7 +136,14 @@ local function clear_ui()
     state.ui[key] = nil
   end
 
-  for _, key in ipairs({ "top_buf", "facet_buf", "list_buf", "preview_buf", "bottom_buf", "preview_header" }) do
+  for _, key in ipairs({
+    "top_buf",
+    "facet_buf",
+    "list_buf",
+    "preview_buf",
+    "bottom_buf",
+    "preview_header",
+  }) do
     state.ui[key] = nil
   end
   closing = false
@@ -218,13 +238,14 @@ local function resolve_dimensions()
   end
 
   if preview_width < min_preview_width or body_height < min_body_height then
-    return nil, string.format(
-      "Wayfinder: editor too small (%dx%d). Need about %dx%d for the 3-pane layout.",
-      vim.o.columns,
-      vim.o.lines,
-      required_columns,
-      required_lines
-    )
+    return nil,
+      string.format(
+        "Wayfinder: editor too small (%dx%d). Need about %dx%d for the 3-pane layout.",
+        vim.o.columns,
+        vim.o.lines,
+        required_columns,
+        required_lines
+      )
   end
 
   return {
@@ -332,9 +353,12 @@ function M.open()
   })
 
   local facet_divider_buf = create_buf("wayfinder://facet-divider")
-  set_lines(facet_divider_buf, vim.tbl_map(function()
-    return "│"
-  end, vim.fn.range(1, body_height)))
+  set_lines(
+    facet_divider_buf,
+    vim.tbl_map(function()
+      return "│"
+    end, vim.fn.range(1, body_height))
+  )
   state.ui.facet_divider = create_window(facet_divider_buf, {
     relative = "editor",
     row = row + 2,
@@ -366,9 +390,12 @@ function M.open()
   })
 
   local list_divider_buf = create_buf("wayfinder://list-divider")
-  set_lines(list_divider_buf, vim.tbl_map(function()
-    return "│"
-  end, vim.fn.range(1, body_height)))
+  set_lines(
+    list_divider_buf,
+    vim.tbl_map(function()
+      return "│"
+    end, vim.fn.range(1, body_height))
+  )
   state.ui.list_divider = create_window(list_divider_buf, {
     relative = "editor",
     row = row + 2,
@@ -425,7 +452,8 @@ local function add_highlights(bufnr, grouped)
   for line, chunks in pairs(grouped or {}) do
     for index, item in ipairs(chunks) do
       local start_col = math.max((item.start_col or 1) - 1, 0)
-      local end_col = item.end_col == -1 and -1 or math.max((item.end_col or start_col + 1) - 1, start_col)
+      local end_col = item.end_col == -1 and -1
+        or math.max((item.end_col or start_col + 1) - 1, start_col)
       set_range_highlight(bufnr, line - 1, start_col, end_col, item.group, 100 + index)
     end
   end
@@ -475,11 +503,15 @@ function M.render(session)
   local notice = state.notice_text()
   local mode_label = session.mode == "symbol" and "Symbol" or "File"
   local subject = session.mode == "symbol" and session.subject or vim.fs.basename(session.path)
-  local source_file = session.mode == "symbol" and paths.display(session.path, session.project_root or session.cwd) or nil
-  local scope_label = session.scope and session.scope.mode ~= "project" and session.scope.label or nil
+  local source_file = session.mode == "symbol"
+      and paths.display(session.path, session.project_root or session.cwd)
+    or nil
+  local scope_label = session.scope and session.scope.mode ~= "project" and session.scope.label
+    or nil
   local separator = "  •  "
   local trail_meta = state.trail_persistence_state()
-  local attached_here = trail_meta.project_root ~= nil and session.project_root ~= nil
+  local attached_here = trail_meta.project_root ~= nil
+    and session.project_root ~= nil
     and trail_meta.project_root == session.project_root
   local detached_here = trail_meta.detached or not attached_here
   local trail_count = session.counts and session.counts.trail or 0
@@ -573,9 +605,12 @@ function M.render(session)
   end
 
   local facet_rows = facets.rows(session)
-  set_lines(state.ui.facet_buf, vim.tbl_map(function(row)
-    return row.line
-  end, facet_rows))
+  set_lines(
+    state.ui.facet_buf,
+    vim.tbl_map(function(row)
+      return row.line
+    end, facet_rows)
+  )
   add_highlights(state.ui.facet_buf, facets.highlights(facet_rows))
 
   local list_rows, list_hl, actions = list.rows(session)

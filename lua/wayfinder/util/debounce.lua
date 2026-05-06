@@ -6,9 +6,13 @@ function M.new(delay, fn)
   return function(...)
     local args = { ... }
     timer:stop()
-    timer:start(delay, 0, vim.schedule_wrap(function()
-      fn(unpack(args))
-    end))
+    timer:start(
+      delay,
+      0,
+      vim.schedule_wrap(function()
+        fn(unpack(args))
+      end)
+    )
   end
 end
 

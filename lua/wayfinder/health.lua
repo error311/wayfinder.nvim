@@ -74,11 +74,15 @@ function M.check()
       if ok_trail_store and resolved.project_root then
         local storage_file = trail_store.project_file(resolved.project_root)
         local saved_count = trail_store.count(resolved.project_root)
+        local last_active = trail_store.last_active(resolved.project_root)
         if storage_file then
           vim.health.info("Saved Trail storage file: " .. storage_file)
         end
         if saved_count ~= nil then
           vim.health.info("Saved Trails for current project: " .. tostring(saved_count))
+        end
+        if last_active then
+          vim.health.info("Last active saved Trail: " .. last_active)
         end
       end
     end
@@ -92,8 +96,13 @@ function M.check()
 
   local ok_config, config = pcall(require, "wayfinder.config")
   if ok_config and config.values then
-    vim.health.info("Current config: performance=" .. tostring(config.values.performance or "balanced"))
-    vim.health.info("Current config: scope.mode=" .. tostring(vim.tbl_get(config.values, "scope", "mode") or "project"))
+    vim.health.info(
+      "Current config: performance=" .. tostring(config.values.performance or "balanced")
+    )
+    vim.health.info(
+      "Current config: scope.mode="
+        .. tostring(vim.tbl_get(config.values, "scope", "mode") or "project")
+    )
   end
 end
 

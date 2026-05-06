@@ -68,16 +68,20 @@ function M.parse(query)
 end
 
 local function haystack(item)
-  return table.concat({
-    item.label or "",
-    item.secondary or "",
-    item.reason or "",
-    item.detail or "",
-  }, "\n"):lower()
+  return table
+    .concat({
+      item.label or "",
+      item.secondary or "",
+      item.reason or "",
+      item.detail or "",
+    }, "\n")
+    :lower()
 end
 
 function M.match(item, query)
-  local parsed = type(query) == "string" and M.parse(query) or query or { include = {}, exclude = {} }
+  local parsed = type(query) == "string" and M.parse(query)
+    or query
+    or { include = {}, exclude = {} }
   local text = haystack(item or {})
 
   for _, term in ipairs(parsed.include or {}) do

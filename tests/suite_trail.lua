@@ -28,7 +28,16 @@ test("trail navigation skips invalid items and wraps", function()
   vim.fn.writefile({ "local a = true" }, file_a)
   vim.fn.writefile({ "local b = true" }, file_b)
 
-  assert_ok(trail.pin({ id = "missing", label = "missing", path = root .. "/missing.lua", lnum = 1, col = 1 }), "pin missing")
+  assert_ok(
+    trail.pin({
+      id = "missing",
+      label = "missing",
+      path = root .. "/missing.lua",
+      lnum = 1,
+      col = 1,
+    }),
+    "pin missing"
+  )
   assert_ok(trail.pin({ id = "a", label = "a", path = file_a, lnum = 1, col = 1 }), "pin a")
   assert_ok(trail.pin({ id = "b", label = "b", path = file_b, lnum = 1, col = 1 }), "pin b")
 
@@ -36,7 +45,10 @@ test("trail navigation skips invalid items and wraps", function()
   assert_ok(vim.api.nvim_buf_get_name(0) == file_a, "trail next should wrap to first valid item")
 
   wayfinder.trail_prev()
-  assert_ok(vim.api.nvim_buf_get_name(0) == file_b, "trail prev should wrap back to previous valid item")
+  assert_ok(
+    vim.api.nvim_buf_get_name(0) == file_b,
+    "trail prev should wrap back to previous valid item"
+  )
 
   wayfinder.trail_open()
   assert_ok(vim.api.nvim_buf_get_name(0) == file_b, "trail open should reopen current trail item")
@@ -69,7 +81,10 @@ test("external Trail traversal still works after loading a saved Trail", functio
   assert_ok(vim.api.nvim_buf_get_name(0) == file_b, "trail next should move through loaded Trail")
 
   wayfinder.trail_prev()
-  assert_ok(vim.api.nvim_buf_get_name(0) == file_a, "trail prev should move back through loaded Trail")
+  assert_ok(
+    vim.api.nvim_buf_get_name(0) == file_a,
+    "trail prev should move back through loaded Trail"
+  )
 end)
 
 test("loaded Trail traversal skips stale missing paths safely", function()
@@ -98,10 +113,16 @@ test("loaded Trail traversal skips stale missing paths safely", function()
   assert_ok(vim.api.nvim_buf_get_name(0) == file_a, "trail open should skip missing first entry")
 
   wayfinder.trail_next()
-  assert_ok(vim.api.nvim_buf_get_name(0) == file_b, "trail next should continue to next valid entry")
+  assert_ok(
+    vim.api.nvim_buf_get_name(0) == file_b,
+    "trail next should continue to next valid entry"
+  )
 
   wayfinder.trail_prev()
-  assert_ok(vim.api.nvim_buf_get_name(0) == file_a, "trail prev should move back among valid entries")
+  assert_ok(
+    vim.api.nvim_buf_get_name(0) == file_a,
+    "trail prev should move back among valid entries"
+  )
 end)
 
 test("trail mutations mark saved and detached working Trails dirty", function()
@@ -111,7 +132,16 @@ test("trail mutations mark saved and detached working Trails dirty", function()
 
   trail.clear({ dirty = false })
   state.reset_trail_persistence()
-  assert_ok(trail.pin({ id = "trail-a", label = "trail a", path = project_root .. "/src/user_service.ts", lnum = 1, col = 1 }), "pin trail a")
+  assert_ok(
+    trail.pin({
+      id = "trail-a",
+      label = "trail a",
+      path = project_root .. "/src/user_service.ts",
+      lnum = 1,
+      col = 1,
+    }),
+    "pin trail a"
+  )
   assert_ok(state.trail_persistence.dirty == true, "expected detached Trail pin to mark dirty")
 
   assert(trail_persistence.save_current("auth bug", {
@@ -120,8 +150,20 @@ test("trail mutations mark saved and detached working Trails dirty", function()
   }))
   assert_ok(state.trail_persistence.dirty == false, "expected save to reset dirty state")
 
-  assert_ok(trail.pin({ id = "trail-b", label = "trail b", path = project_root .. "/tests/user_service_test.ts", lnum = 1, col = 1 }), "pin trail b")
-  assert_ok(state.trail_persistence.active_name == "auth bug", "expected active saved Trail to stay attached after mutation")
+  assert_ok(
+    trail.pin({
+      id = "trail-b",
+      label = "trail b",
+      path = project_root .. "/tests/user_service_test.ts",
+      lnum = 1,
+      col = 1,
+    }),
+    "pin trail b"
+  )
+  assert_ok(
+    state.trail_persistence.active_name == "auth bug",
+    "expected active saved Trail to stay attached after mutation"
+  )
   assert_ok(state.trail_persistence.dirty == true, "expected attached Trail pin to mark dirty")
 
   assert_ok(trail.remove("trail-b"), "remove trail b")
@@ -134,6 +176,9 @@ test("trail mutations mark saved and detached working Trails dirty", function()
   assert_ok(state.trail_persistence.dirty == false, "expected load to restore clean saved state")
 
   trail.clear()
-  assert_ok(state.trail_persistence.active_name == "auth bug", "expected clear to keep active saved Trail association")
+  assert_ok(
+    state.trail_persistence.active_name == "auth bug",
+    "expected clear to keep active saved Trail association"
+  )
   assert_ok(state.trail_persistence.dirty == true, "expected clear to mark attached Trail dirty")
 end)

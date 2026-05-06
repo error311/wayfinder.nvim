@@ -108,7 +108,8 @@ local function apply_compat(values, opts)
       values.limits.text.max_results = opts.max_results_per_facet
     end
     if not vim.tbl_get(opts, "limits", "tests", "max_results") then
-      values.limits.tests.max_results = math.min(opts.max_results_per_facet, values.limits.tests.max_results)
+      values.limits.tests.max_results =
+        math.min(opts.max_results_per_facet, values.limits.tests.max_results)
     end
   end
 end

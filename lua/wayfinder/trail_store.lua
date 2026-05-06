@@ -217,7 +217,8 @@ function M.write_project(project_root, data, opts)
     return nil, "encode_failed"
   end
 
-  local write_ok, write_err = pcall(vim.fn.writefile, vim.split(encoded, "\n", { plain = true }), path)
+  local write_ok, write_err =
+    pcall(vim.fn.writefile, vim.split(encoded, "\n", { plain = true }), path)
   if not write_ok then
     return nil, write_err
   end
@@ -281,7 +282,11 @@ function M.set(project_root, trail_data, opts)
     return nil, "missing_project_root"
   end
 
-  if type(trail_data) ~= "table" or type(trail_data.name) ~= "string" or vim.trim(trail_data.name) == "" then
+  if
+    type(trail_data) ~= "table"
+    or type(trail_data.name) ~= "string"
+    or vim.trim(trail_data.name) == ""
+  then
     return nil, "invalid_trail"
   end
 
@@ -296,8 +301,45 @@ function M.set(project_root, trail_data, opts)
   entry.created_at = trail_data.created_at or (existing and existing.created_at) or os.time()
   entry.updated_at = trail_data.updated_at or os.time()
   data.trails[name] = entry
+  data.last_active = name
 
   return M.write_project(root, data, opts)
+end
+
+function M.last_active(project_root, opts)
+  local data, err = M.read_project(project_root, opts)
+  if not data then
+    return nil, err
+  end
+
+  if type(data.last_active) ~= "string" or data.last_active == "" then
+    return nil
+  end
+
+  if data.trails[data.last_active] == nil then
+    return nil
+  end
+
+  return data.last_active
+end
+
+function M.activate(project_root, name, opts)
+  local data, err = M.read_project(project_root, opts)
+  if not data then
+    return nil, err
+  end
+
+  if data.trails[name] == nil then
+    return nil, "missing_trail"
+  end
+
+  data.last_active = name
+  local updated, write_err = M.write_project(project_root, data, opts)
+  if not updated then
+    return nil, write_err
+  end
+
+  return vim.deepcopy(updated.trails[name])
 end
 
 function M.rename(project_root, old_name, new_name, opts)

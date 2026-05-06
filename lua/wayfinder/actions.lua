@@ -129,6 +129,9 @@ local function persistence_error_message(err, name)
   if err == "no_saved_trails" then
     return "Wayfinder: No saved Trails"
   end
+  if err == "no_last_active" then
+    return "Wayfinder: No recent saved Trail"
+  end
   return "Wayfinder: Trail persistence failed"
 end
 
@@ -471,7 +474,10 @@ function M.pin()
   local item = selection_item()
   if item and trail.pin(item) then
     local trail_count = #trail.items()
-    state.set_notice(string.format("Pinned to Trail • %d item%s", trail_count, trail_count == 1 and "" or "s"), 1800)
+    state.set_notice(
+      string.format("Pinned to Trail • %d item%s", trail_count, trail_count == 1 and "" or "s"),
+      1800
+    )
     rerender()
   end
 end
@@ -541,7 +547,8 @@ function M.trail_save_as(opts)
     local saved, err = trail_persistence.save_current_as(name)
     if not saved and err == "name_exists" then
       confirm_overwrite(name, function(confirm_done)
-        local overwritten, overwrite_err = trail_persistence.save_current_as(name, { overwrite = true })
+        local overwritten, overwrite_err =
+          trail_persistence.save_current_as(name, { overwrite = true })
         if not overwritten then
           if overwrite_err == "empty" then
             persistence_notice(persistence_error_message(overwrite_err))
@@ -559,10 +566,13 @@ function M.trail_save_as(opts)
         confirm_done()
         done()
         finish()
-      end, { suspend = false, on_cancel = function()
-        done()
-        finish()
-      end })
+      end, {
+        suspend = false,
+        on_cancel = function()
+          done()
+          finish()
+        end,
+      })
       return
     end
 
@@ -601,6 +611,28 @@ function M.trail_load(opts)
     done()
     finish()
   end, { suspend = opts.suspend, on_cancel = finish })
+end
+
+function M.trail_resume(opts)
+  opts = opts or {}
+  local loaded, err = trail_persistence.resume(opts)
+  if not loaded then
+    if err == "no_last_active" then
+      persistence_notice(persistence_error_message(err))
+    else
+      persistence_warn(err)
+    end
+    if opts.on_done then
+      opts.on_done()
+    end
+    return
+  end
+
+  rerender_trail_state({ reset_selection = current() and current().facet == "trail" })
+  persistence_notice(string.format("Resumed Trail: %s", loaded.name))
+  if opts.on_done then
+    opts.on_done()
+  end
 end
 
 local function cycle_saved_trail(delta)
@@ -675,10 +707,13 @@ function M.trail_rename(opts)
       input_done()
       select_done()
       finish()
-    end, { suspend = false, on_cancel = function()
-      select_done()
-      finish()
-    end })
+    end, {
+      suspend = false,
+      on_cancel = function()
+        select_done()
+        finish()
+      end,
+    })
   end, { suspend = opts.suspend, on_cancel = finish })
 end
 
@@ -687,6 +722,7 @@ function M.trail_menu()
     vim.ui.select({
       "Save Trail",
       "Save Trail As",
+      "Resume Last Trail",
       "Load Trail",
       "Rename Trail",
       "Delete Trail",
@@ -697,6 +733,8 @@ function M.trail_menu()
         M.trail_save({ suspend = false, on_done = done })
       elseif choice == "Save Trail As" then
         M.trail_save_as({ suspend = false, on_done = done })
+      elseif choice == "Resume Last Trail" then
+        M.trail_resume({ on_done = done })
       elseif choice == "Load Trail" then
         M.trail_load({ suspend = false, on_done = done })
       elseif choice == "Rename Trail" then

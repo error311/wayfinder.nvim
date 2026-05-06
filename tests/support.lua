@@ -168,7 +168,7 @@ local function make_monorepo_fixture()
 
   vim.fn.writefile({
     'export const adminUserCopy = "createUser";',
-    'export function createUserBanner() {',
+    "export function createUserBanner() {",
     '  return "createUser";',
     "}",
   }, admin_root .. "/src/user_page.ts")

@@ -20,7 +20,10 @@ test("trail persistence state tracks saved detach and dirty metadata", function(
   state.attach_saved_trail("auth bug", { project_root = git_fixture_root })
   meta = state.trail_persistence_state()
   assert_ok(meta.active_name == "auth bug", "expected attached saved Trail name")
-  assert_ok(meta.project_root == vim.fs.normalize(git_fixture_root), "expected attached saved Trail project root")
+  assert_ok(
+    meta.project_root == vim.fs.normalize(git_fixture_root),
+    "expected attached saved Trail project root"
+  )
   assert_ok(meta.detached == false, "expected attached saved Trail state")
   assert_ok(meta.dirty == false, "expected attached Trail to start clean")
 
@@ -57,13 +60,26 @@ test("trail store persists and lists named trails per project", function()
   local written = assert(trail_store.set(project_root, {
     name = "auth bug",
     items = {
-      { id = "trail-a", label = "trail a", path = project_root .. "/src/user_service.ts", lnum = 1, col = 1 },
-      { id = "trail-b", label = "trail b", path = project_root .. "/tests/user_service_test.ts", lnum = 1, col = 1 },
+      {
+        id = "trail-a",
+        label = "trail a",
+        path = project_root .. "/src/user_service.ts",
+        lnum = 1,
+        col = 1,
+      },
+      {
+        id = "trail-b",
+        label = "trail b",
+        path = project_root .. "/tests/user_service_test.ts",
+        lnum = 1,
+        col = 1,
+      },
     },
   }, { state_root = state_root }))
 
   assert_ok(written.trails["auth bug"] ~= nil, "expected saved trail entry")
   assert_ok(#written.trails["auth bug"].items == 2, "expected saved trail items")
+  assert_ok(written.last_active == "auth bug", "expected saved Trail to become last active")
 
   local names = assert(trail_store.list(project_root, { state_root = state_root }))
   assert_ok(vim.deep_equal(names, { "auth bug" }), "expected named trail listing")
@@ -113,7 +129,10 @@ test("trail store keeps durable item fields and strips row-only fields", functio
   local item = loaded.items[1]
 
   assert_ok(item.reason == "recent commit touching current file", "expected reason to persist")
-  assert_ok(item.preview_range and item.preview_range.start == 1 and item.preview_range["end"] == 10, "expected preview range to persist")
+  assert_ok(
+    item.preview_range and item.preview_range.start == 1 and item.preview_range["end"] == 10,
+    "expected preview range to persist"
+  )
   assert_ok(item.git and item.git.hash == "abcd123", "expected git preview metadata to persist")
   assert_ok(item.score == nil, "expected transient score to be stripped")
   assert_ok(item.icon == nil, "expected transient icon to be stripped")
@@ -128,41 +147,85 @@ test("trail store deletes saved trails without touching other entries", function
 
   assert(trail_store.set(project_root, {
     name = "auth bug",
-    items = { { id = "trail-a", label = "trail a", path = project_root .. "/src/user_service.ts", lnum = 1, col = 1 } },
+    items = {
+      {
+        id = "trail-a",
+        label = "trail a",
+        path = project_root .. "/src/user_service.ts",
+        lnum = 1,
+        col = 1,
+      },
+    },
   }, { state_root = state_root }))
 
   assert(trail_store.set(project_root, {
     name = "refactor targets",
-    items = { { id = "trail-b", label = "trail b", path = project_root .. "/tests/user_service_test.ts", lnum = 1, col = 1 } },
+    items = {
+      {
+        id = "trail-b",
+        label = "trail b",
+        path = project_root .. "/tests/user_service_test.ts",
+        lnum = 1,
+        col = 1,
+      },
+    },
   }, { state_root = state_root }))
 
-  local _, removed = assert(trail_store.delete(project_root, "auth bug", { state_root = state_root }))
+  local _, removed =
+    assert(trail_store.delete(project_root, "auth bug", { state_root = state_root }))
   assert_ok(removed == true, "expected saved trail deletion")
+  local after_delete = assert(trail_store.read_project(project_root, { state_root = state_root }))
+  assert_ok(
+    after_delete.last_active == "refactor targets",
+    "expected deleting inactive Trail to preserve last active Trail"
+  )
 
   local names = assert(trail_store.list(project_root, { state_root = state_root }))
   assert_ok(vim.deep_equal(names, { "refactor targets" }), "expected other saved trail to remain")
 end)
 
-test("trail store keeps empty saved-trails JSON as an object after deleting the last entry", function()
-  -- Guards the on-disk JSON shape so deleting the last saved Trail does not turn the trails map into an array.
-  local state_root = vim.fs.normalize(vim.fn.tempname())
-  local project_root = git_fixture_root
+test(
+  "trail store keeps empty saved-trails JSON as an object after deleting the last entry",
+  function()
+    -- Guards the on-disk JSON shape so deleting the last saved Trail does not turn the trails map into an array.
+    local state_root = vim.fs.normalize(vim.fn.tempname())
+    local project_root = git_fixture_root
 
-  assert(trail_store.set(project_root, {
-    name = "auth bug",
-    items = { { id = "trail-a", label = "trail a", path = project_root .. "/src/user_service.ts", lnum = 1, col = 1 } },
-  }, { state_root = state_root }))
+    assert(trail_store.set(project_root, {
+      name = "auth bug",
+      items = {
+        {
+          id = "trail-a",
+          label = "trail a",
+          path = project_root .. "/src/user_service.ts",
+          lnum = 1,
+          col = 1,
+        },
+      },
+    }, { state_root = state_root }))
 
-  local updated, removed = assert(trail_store.delete(project_root, "auth bug", { state_root = state_root }))
-  assert_ok(removed == true, "expected final saved Trail deletion")
-  assert_ok(vim.tbl_isempty(updated.trails), "expected no saved trails after final delete")
+    local updated, removed =
+      assert(trail_store.delete(project_root, "auth bug", { state_root = state_root }))
+    assert_ok(removed == true, "expected final saved Trail deletion")
+    assert_ok(vim.tbl_isempty(updated.trails), "expected no saved trails after final delete")
+    assert_ok(
+      updated.last_active == nil,
+      "expected deleting the active Trail to clear last active Trail"
+    )
 
-  local storage_file = assert(trail_store.project_file(project_root, { state_root = state_root }))
-  local raw = table.concat(vim.fn.readfile(storage_file), "\n")
-  local decoded = assert(vim.json.decode(raw))
-  assert_ok(type(decoded.trails) == "table" and next(decoded.trails) == nil, "expected empty decoded trails table")
-  assert_ok(string.find(raw, [["trails":{}]], 1, true) ~= nil, "expected trails to persist as an empty object")
-end)
+    local storage_file = assert(trail_store.project_file(project_root, { state_root = state_root }))
+    local raw = table.concat(vim.fn.readfile(storage_file), "\n")
+    local decoded = assert(vim.json.decode(raw))
+    assert_ok(
+      type(decoded.trails) == "table" and next(decoded.trails) == nil,
+      "expected empty decoded trails table"
+    )
+    assert_ok(
+      string.find(raw, [["trails":{}]], 1, true) ~= nil,
+      "expected trails to persist as an empty object"
+    )
+  end
+)
 
 test("trail store fails safely on invalid project storage", function()
   -- Guards corrupt-storage behavior so persistence failures stay contained and predictable.
@@ -198,17 +261,42 @@ test("trail persistence saves current Trail and reuses active saved name", funct
 
   trail.clear()
   state.reset_trail_persistence()
-  assert_ok(trail.pin({ id = "trail-a", label = "trail a", path = project_root .. "/src/user_service.ts", lnum = 1, col = 1 }), "pin trail a")
-  assert_ok(trail.pin({ id = "trail-b", label = "trail b", path = project_root .. "/tests/user_service_test.ts", lnum = 1, col = 1 }), "pin trail b")
+  assert_ok(
+    trail.pin({
+      id = "trail-a",
+      label = "trail a",
+      path = project_root .. "/src/user_service.ts",
+      lnum = 1,
+      col = 1,
+    }),
+    "pin trail a"
+  )
+  assert_ok(
+    trail.pin({
+      id = "trail-b",
+      label = "trail b",
+      path = project_root .. "/tests/user_service_test.ts",
+      lnum = 1,
+      col = 1,
+    }),
+    "pin trail b"
+  )
 
   local saved = assert(trail_persistence.save_current("auth bug", {
     project_root = project_root,
     state_root = state_root,
   }))
   assert_ok(saved.name == "auth bug", "expected saved Trail name")
-  assert_ok(state.trail_persistence.active_name == "auth bug", "expected active saved Trail name after save")
+  assert_ok(
+    state.trail_persistence.active_name == "auth bug",
+    "expected active saved Trail name after save"
+  )
   assert_ok(state.trail_persistence.detached == false, "expected attached state after save")
   assert_ok(state.trail_persistence.dirty == false, "expected clean state after save")
+  assert_ok(trail_persistence.last_active({
+    project_root = project_root,
+    state_root = state_root,
+  }) == "auth bug", "expected save to record last active Trail")
 
   local names = assert(trail_persistence.list({
     project_root = project_root,
@@ -216,7 +304,16 @@ test("trail persistence saves current Trail and reuses active saved name", funct
   }))
   assert_ok(vim.deep_equal(names, { "auth bug" }), "expected saved Trail listing")
 
-  assert_ok(trail.pin({ id = "trail-c", label = "trail c", path = project_root .. "/src/user_service.ts", lnum = 2, col = 1 }), "pin trail c")
+  assert_ok(
+    trail.pin({
+      id = "trail-c",
+      label = "trail c",
+      path = project_root .. "/src/user_service.ts",
+      lnum = 2,
+      col = 1,
+    }),
+    "pin trail c"
+  )
   local updated = assert(trail_persistence.save_current(nil, {
     project_root = project_root,
     state_root = state_root,
@@ -231,11 +328,27 @@ test("trail persistence reports saved Trail count for the current project", func
 
   assert(trail_store.set(project_root, {
     name = "auth bug",
-    items = { { id = "trail-a", label = "trail a", path = project_root .. "/src/user_service.ts", lnum = 1, col = 1 } },
+    items = {
+      {
+        id = "trail-a",
+        label = "trail a",
+        path = project_root .. "/src/user_service.ts",
+        lnum = 1,
+        col = 1,
+      },
+    },
   }, { state_root = state_root }))
   assert(trail_store.set(project_root, {
     name = "refactor targets",
-    items = { { id = "trail-b", label = "trail b", path = project_root .. "/tests/user_service_test.ts", lnum = 1, col = 1 } },
+    items = {
+      {
+        id = "trail-b",
+        label = "trail b",
+        path = project_root .. "/tests/user_service_test.ts",
+        lnum = 1,
+        col = 1,
+      },
+    },
   }, { state_root = state_root }))
 
   local count = assert(trail_persistence.saved_count({
@@ -252,12 +365,29 @@ test("trail persistence save as refuses duplicate saved names", function()
 
   assert(trail_store.set(project_root, {
     name = "auth bug",
-    items = { { id = "trail-a", label = "trail a", path = project_root .. "/src/user_service.ts", lnum = 1, col = 1 } },
+    items = {
+      {
+        id = "trail-a",
+        label = "trail a",
+        path = project_root .. "/src/user_service.ts",
+        lnum = 1,
+        col = 1,
+      },
+    },
   }, { state_root = state_root }))
 
   trail.clear({ dirty = false })
   state.reset_trail_persistence()
-  assert_ok(trail.pin({ id = "trail-b", label = "trail b", path = project_root .. "/tests/user_service_test.ts", lnum = 1, col = 1 }), "pin trail b")
+  assert_ok(
+    trail.pin({
+      id = "trail-b",
+      label = "trail b",
+      path = project_root .. "/tests/user_service_test.ts",
+      lnum = 1,
+      col = 1,
+    }),
+    "pin trail b"
+  )
 
   local saved, err = trail_persistence.save_current_as("auth bug", {
     project_root = project_root,
@@ -277,7 +407,16 @@ test("trail persistence only reuses active saved names inside the same project",
 
   trail.clear({ dirty = false })
   state.reset_trail_persistence()
-  assert_ok(trail.pin({ id = "trail-a", label = "trail a", path = project_root_a .. "/src/user_service.ts", lnum = 1, col = 1 }), "pin trail a")
+  assert_ok(
+    trail.pin({
+      id = "trail-a",
+      label = "trail a",
+      path = project_root_a .. "/src/user_service.ts",
+      lnum = 1,
+      col = 1,
+    }),
+    "pin trail a"
+  )
   assert(trail_persistence.save_current("auth bug", {
     project_root = project_root_a,
     state_root = state_root,
@@ -308,13 +447,25 @@ test("trail persistence cycles saved Trails within the current project", functio
   assert(trail_store.set(project_root, {
     name = "alpha",
     items = {
-      { id = "trail-a", label = "trail a", path = project_root .. "/src/user_service.ts", lnum = 1, col = 1 },
+      {
+        id = "trail-a",
+        label = "trail a",
+        path = project_root .. "/src/user_service.ts",
+        lnum = 1,
+        col = 1,
+      },
     },
   }, { state_root = state_root }))
   assert(trail_store.set(project_root, {
     name = "beta",
     items = {
-      { id = "trail-b", label = "trail b", path = project_root .. "/tests/user_service_test.ts", lnum = 1, col = 1 },
+      {
+        id = "trail-b",
+        label = "trail b",
+        path = project_root .. "/tests/user_service_test.ts",
+        lnum = 1,
+        col = 1,
+      },
     },
   }, { state_root = state_root }))
 
@@ -325,8 +476,14 @@ test("trail persistence cycles saved Trails within the current project", functio
     project_root = project_root,
     state_root = state_root,
   }))
-  assert_ok(first.name == "alpha", "expected forward cycle without active Trail to start at first saved Trail")
-  assert_ok(state.trail_persistence.active_name == "alpha", "expected first cycle to attach first saved Trail")
+  assert_ok(
+    first.name == "alpha",
+    "expected forward cycle without active Trail to start at first saved Trail"
+  )
+  assert_ok(
+    state.trail_persistence.active_name == "alpha",
+    "expected first cycle to attach first saved Trail"
+  )
 
   local next_loaded = assert(trail_persistence.cycle(1, {
     project_root = project_root,
@@ -355,21 +512,45 @@ test("trail persistence load replaces the working Trail in order", function()
   assert(trail_store.set(project_root, {
     name = "auth bug",
     items = {
-      { id = "trail-a", label = "trail a", path = project_root .. "/src/user_service.ts", lnum = 1, col = 1 },
-      { id = "trail-b", label = "trail b", path = project_root .. "/tests/user_service_test.ts", lnum = 1, col = 1 },
+      {
+        id = "trail-a",
+        label = "trail a",
+        path = project_root .. "/src/user_service.ts",
+        lnum = 1,
+        col = 1,
+      },
+      {
+        id = "trail-b",
+        label = "trail b",
+        path = project_root .. "/tests/user_service_test.ts",
+        lnum = 1,
+        col = 1,
+      },
     },
   }, { state_root = state_root }))
 
   trail.clear()
   state.reset_trail_persistence()
-  assert_ok(trail.pin({ id = "old", label = "old", path = project_root .. "/src/user_service.ts", lnum = 9, col = 1 }), "pin old")
+  assert_ok(
+    trail.pin({
+      id = "old",
+      label = "old",
+      path = project_root .. "/src/user_service.ts",
+      lnum = 9,
+      col = 1,
+    }),
+    "pin old"
+  )
 
   local loaded = assert(trail_persistence.load("auth bug", {
     project_root = project_root,
     state_root = state_root,
   }))
   assert_ok(loaded.name == "auth bug", "expected loaded Trail")
-  assert_ok(state.trail_persistence.active_name == "auth bug", "expected active saved name after load")
+  assert_ok(
+    state.trail_persistence.active_name == "auth bug",
+    "expected active saved name after load"
+  )
   assert_ok(state.trail_persistence.detached == false, "expected attached state after load")
   assert_ok(state.trail_persistence.dirty == false, "expected clean state after load")
 
@@ -380,6 +561,70 @@ test("trail persistence load replaces the working Trail in order", function()
   assert_ok(trail.cursor() == 1, "expected Trail cursor reset on load")
 end)
 
+test("trail persistence resumes the last active saved Trail", function()
+  -- Guards explicit resume so users can restore the last saved exploration path without opening the Trail picker.
+  local state_root = vim.fs.normalize(vim.fn.tempname())
+  local project_root = git_fixture_root
+
+  assert(trail_store.set(project_root, {
+    name = "alpha",
+    items = {
+      {
+        id = "trail-a",
+        label = "trail a",
+        path = project_root .. "/src/user_service.ts",
+        lnum = 1,
+        col = 1,
+      },
+    },
+  }, { state_root = state_root }))
+  assert(trail_store.set(project_root, {
+    name = "beta",
+    items = {
+      {
+        id = "trail-b",
+        label = "trail b",
+        path = project_root .. "/tests/user_service_test.ts",
+        lnum = 1,
+        col = 1,
+      },
+    },
+  }, { state_root = state_root }))
+
+  trail.clear({ dirty = false })
+  state.reset_trail_persistence()
+
+  local resumed = assert(trail_persistence.resume({
+    project_root = project_root,
+    state_root = state_root,
+  }))
+  assert_ok(resumed.name == "beta", "expected resume to load last active saved Trail")
+  assert_ok(
+    state.trail_persistence.active_name == "beta",
+    "expected resumed Trail to attach saved name"
+  )
+  assert_ok(
+    trail.items()[1].id == "trail-b",
+    "expected resumed Trail items to replace working Trail"
+  )
+end)
+
+test("trail persistence reports when there is no last active Trail to resume", function()
+  -- Guards the empty resume path so the command can report a clear user-facing message.
+  local state_root = vim.fs.normalize(vim.fn.tempname())
+  local project_root = git_fixture_root
+
+  trail.clear({ dirty = false })
+  state.reset_trail_persistence()
+
+  local resumed, err = trail_persistence.resume({
+    project_root = project_root,
+    state_root = state_root,
+  })
+  assert_ok(resumed == nil, "expected resume without a last active Trail to refuse")
+  assert_ok(err == "no_last_active", "expected missing last active error")
+end)
+
 test("trail persistence delete detaches the active saved Trail", function()
   -- Guards delete semantics so removing the saved entry does not destroy the current working Trail.
   local state_root = vim.fs.normalize(vim.fn.tempname())
@@ -387,7 +632,16 @@ test("trail persistence delete detaches the active saved Trail", function()
 
   trail.clear()
   state.reset_trail_persistence()
-  assert_ok(trail.pin({ id = "trail-a", label = "trail a", path = project_root .. "/src/user_service.ts", lnum = 1, col = 1 }), "pin trail a")
+  assert_ok(
+    trail.pin({
+      id = "trail-a",
+      label = "trail a",
+      path = project_root .. "/src/user_service.ts",
+      lnum = 1,
+      col = 1,
+    }),
+    "pin trail a"
+  )
   assert(trail_persistence.save_current("auth bug", {
     project_root = project_root,
     state_root = state_root,
@@ -399,7 +653,10 @@ test("trail persistence delete detaches the active saved Trail", function()
   }))
   assert_ok(removed == true, "expected saved Trail deletion")
   assert_ok(state.trail_persistence.active_name == nil, "expected deleted active Trail to detach")
-  assert_ok(state.trail_persistence.detached == true, "expected detached state after deleting active saved Trail")
+  assert_ok(
+    state.trail_persistence.detached == true,
+    "expected detached state after deleting active saved Trail"
+  )
   assert_ok(#trail.items() == 1, "expected working Trail items to remain after delete")
 end)
 
@@ -410,7 +667,16 @@ test("trail persistence rename updates saved and active trail names", function()
 
   trail.clear({ dirty = false })
   state.reset_trail_persistence()
-  assert_ok(trail.pin({ id = "trail-a", label = "trail a", path = project_root .. "/src/user_service.ts", lnum = 1, col = 1 }), "pin trail a")
+  assert_ok(
+    trail.pin({
+      id = "trail-a",
+      label = "trail a",
+      path = project_root .. "/src/user_service.ts",
+      lnum = 1,
+      col = 1,
+    }),
+    "pin trail a"
+  )
   assert(trail_persistence.save_current("auth bug", {
     project_root = project_root,
     state_root = state_root,
@@ -421,7 +687,14 @@ test("trail persistence rename updates saved and active trail names", function()
     state_root = state_root,
   }))
   assert_ok(renamed.name == "auth bug v2", "expected renamed saved Trail")
-  assert_ok(state.trail_persistence.active_name == "auth bug v2", "expected active saved Trail name to update on rename")
+  assert_ok(
+    state.trail_persistence.active_name == "auth bug v2",
+    "expected active saved Trail name to update on rename"
+  )
+  assert_ok(trail_persistence.last_active({
+    project_root = project_root,
+    state_root = state_root,
+  }) == "auth bug v2", "expected last active Trail name to update on rename")
 
   local names = assert(trail_persistence.list({
     project_root = project_root,

@@ -23,7 +23,10 @@ local function file_candidates(ctx, done)
     end
 
     done(vim.fs.find(function(name)
-      return name:match("%.lua$") or name:match("%.ts$") or name:match("%.tsx$") or name:match("%.js$")
+      return name:match("%.lua$")
+        or name:match("%.ts$")
+        or name:match("%.tsx$")
+        or name:match("%.js$")
     end, {
       path = root,
       type = "file",

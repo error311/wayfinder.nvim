@@ -105,12 +105,13 @@ local function filtered_items(session)
     all_items = trail.items()
     for index, item in ipairs(all_items) do
       local previous = all_items[index - 1]
-      local destination = string.format("%s:%d", paths.display(item.path, session.project_root), item.lnum or 1)
+      local destination =
+        string.format("%s:%d", paths.display(item.path, session.project_root), item.lnum or 1)
 
       item.icon = index == 1 and config.values.icons.trail or "↳"
       item.group = "Pinned Trail"
       item.secondary = previous
-        and string.format("%02d  %s → %s", index, previous.label, destination)
+          and string.format("%02d  %s → %s", index, previous.label, destination)
         or string.format("%02d  %s", index, destination)
     end
   end
@@ -167,7 +168,9 @@ local function aggregate_items(session)
   end
   table.sort(merged, items.score_sort)
   session.items = merged
-  session.loading = session.results.lsp.loading or session.results.tests.loading or session.results.git.loading
+  session.loading = session.results.lsp.loading
+    or session.results.tests.loading
+    or session.results.git.loading
   refresh_visible(session)
 end
 
@@ -415,6 +418,10 @@ end
 
 function M.trail_load()
   actions.trail_load()
+end
+
+function M.trail_resume()
+  actions.trail_resume()
 end
 
 function M.trail_delete()

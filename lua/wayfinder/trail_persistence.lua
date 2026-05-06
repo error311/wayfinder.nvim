@@ -80,6 +80,15 @@ function M.saved_count(opts)
   return trail_store.count(project_root, opts)
 end
 
+function M.last_active(opts)
+  local project_root = resolve_project_root(opts)
+  if not project_root then
+    return nil, "missing_project_root"
+  end
+
+  return trail_store.last_active(project_root, opts)
+end
+
 function M.cycle(delta, opts)
   opts = opts or {}
   local project_root = resolve_project_root(opts)
@@ -195,12 +204,35 @@ function M.load(name, opts)
     return nil, err
   end
 
-  trail.replace(entry.items, { cursor = 1, dirty = false })
+  local activated, activate_err = trail_store.activate(project_root, target_name, opts)
+  if not activated then
+    return nil, activate_err
+  end
+
+  trail.replace(activated.items, { cursor = 1, dirty = false })
   state.attach_saved_trail(target_name, {
     project_root = project_root,
     dirty = false,
   })
-  return entry
+  return activated
+end
+
+function M.resume(opts)
+  opts = opts or {}
+  local project_root = resolve_project_root(opts)
+  if not project_root then
+    return nil, "missing_project_root"
+  end
+
+  local name, err = trail_store.last_active(project_root, opts)
+  if err then
+    return nil, err
+  end
+  if not name then
+    return nil, "no_last_active"
+  end
+
+  return M.load(name, opts)
 end
 
 function M.delete(name, opts)

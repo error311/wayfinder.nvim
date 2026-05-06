@@ -77,7 +77,8 @@ local function preview_header(session, item)
   elseif item.lnum then
     suffix = string.format("  :%d", item.lnum)
   end
-  local width = state.ui.preview and vim.api.nvim_win_is_valid(state.ui.preview)
+  local width = state.ui.preview
+      and vim.api.nvim_win_is_valid(state.ui.preview)
       and math.max(vim.api.nvim_win_get_width(state.ui.preview) - 1, 1)
     or 80
   return {
@@ -88,7 +89,8 @@ end
 
 local function snippet_window(item)
   local winid = state.ui.preview
-  local win_height = winid and vim.api.nvim_win_is_valid(winid)
+  local win_height = winid
+      and vim.api.nvim_win_is_valid(winid)
       and vim.api.nvim_win_get_height(winid)
     or 24
   local before = math.max(math.floor((win_height - 3) * 0.35), 10)
@@ -164,15 +166,16 @@ local function render_lines(session, item, filetype, lines, preview_start)
     end
 
     local target_line = math.max(item.lnum or 1, 1)
-    local start_line = math.max((item.preview_range and item.preview_range.start) or (target_line - 1), 1)
-    local end_line = math.max((item.preview_range and item.preview_range["end"] or (target_line + 2)), start_line + 1)
+    local start_line =
+      math.max((item.preview_range and item.preview_range.start) or (target_line - 1), 1)
+    local end_line = math.max(
+      (item.preview_range and item.preview_range["end"] or (target_line + 2)),
+      start_line + 1
+    )
     local preview_offset = math.max(start_line - (preview_start or start_line), 0)
     local target_offset = math.max(target_line - (preview_start or target_line), 0)
     local extmark_start = math.min(preview_offset, line_count - 1) + 1
-    local extmark_end = math.min(
-      preview_offset + math.max(end_line - start_line, 1),
-      line_count
-    )
+    local extmark_end = math.min(preview_offset + math.max(end_line - start_line, 1), line_count)
     local target_extmark = math.min(target_offset, line_count - 1) + 1
 
     vim.api.nvim_buf_set_extmark(bufnr, state.ui.preview_ns, extmark_start, 0, {
@@ -213,12 +216,12 @@ local function render_git_preview(session, item)
       return
     end
 
-    local lines = result.code == 0
-      and vim.split(result.stdout or "", "\n", { trimempty = true })
+    local lines = result.code == 0 and vim.split(result.stdout or "", "\n", { trimempty = true })
       or {
         "Unable to preview git revision.",
         "",
-        vim.trim(result.stderr or "") ~= "" and vim.trim(result.stderr) or "git show returned no preview text.",
+        vim.trim(result.stderr or "") ~= "" and vim.trim(result.stderr)
+          or "git show returned no preview text.",
       }
 
     render_lines(session, item, vim.filetype.match({ filename = item.path }) or "", lines, 1)

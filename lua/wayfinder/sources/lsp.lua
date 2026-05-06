@@ -116,9 +116,10 @@ local function location_item(facet, kind, badge, score, location, ctx)
     badge = badge,
     detail = paths.display(path, ctx.project_root),
     secondary = paths.display(path, ctx.project_root),
-    group = facet == "calls" and (kind == "definition" and "Definitions" or "Callers") or "LSP References",
+    group = facet == "calls" and (kind == "definition" and "Definitions" or "Callers")
+      or "LSP References",
     icon = facet == "calls"
-      and (kind == "definition" and config.values.icons.definition or config.values.icons.caller)
+        and (kind == "definition" and config.values.icons.definition or config.values.icons.caller)
       or config.values.icons.reference,
   }
 end
@@ -282,7 +283,12 @@ end
 
 local function grep_references(ctx, callback)
   local text_limits = config.values.limits.text
-  if not text_limits.enabled or not ctx.symbol or ctx.symbol.text == "" or vim.fn.executable("rg") ~= 1 then
+  if
+    not text_limits.enabled
+    or not ctx.symbol
+    or ctx.symbol.text == ""
+    or vim.fn.executable("rg") ~= 1
+  then
     callback({})
     return
   end
@@ -343,7 +349,12 @@ local function grep_references(ctx, callback)
     local path = paths.normalize(base .. "/" .. relative)
     local lnum = tonumber(row)
     local cnum = tonumber(col)
-    if not path or not lnum or not cnum or (path == ctx.path and current_line and lnum == current_line) then
+    if
+      not path
+      or not lnum
+      or not cnum
+      or (path == ctx.path and current_line and lnum == current_line)
+    then
       return
     end
 
@@ -448,15 +459,27 @@ local function grep_references(ctx, callback)
 end
 
 local function gather_definitions(ctx, push)
-  request_all(ctx.bufnr, "textDocument/definition", current_params(ctx.bufnr), ctx, function(responses)
-    process_response_locations(responses, function(location, current_ctx)
-      return location_item("calls", "definition", "DEF", 120, location, current_ctx)
-    end, ctx, {}, function(found)
-      if active(ctx) then
-        push(found)
-      end
-    end)
-  end)
+  request_all(
+    ctx.bufnr,
+    "textDocument/definition",
+    current_params(ctx.bufnr),
+    ctx,
+    function(responses)
+      process_response_locations(
+        responses,
+        function(location, current_ctx)
+          return location_item("calls", "definition", "DEF", 120, location, current_ctx)
+        end,
+        ctx,
+        {},
+        function(found)
+          if active(ctx) then
+            push(found)
+          end
+        end
+      )
+    end
+  )
 end
 
 local function gather_references(ctx, push)
@@ -469,17 +492,27 @@ local function gather_references(ctx, push)
     })
 
     request_all(ctx.bufnr, "textDocument/references", params, ctx, function(responses)
-      process_response_locations(responses, function(location, current_ctx)
-        local item = location_item("refs", "reference", "REF", 90, location, current_ctx)
-        if item and current_ctx.scope_root and not scope.contains(current_ctx.scope_root, item.path) then
-          return nil
+      process_response_locations(
+        responses,
+        function(location, current_ctx)
+          local item = location_item("refs", "reference", "REF", 90, location, current_ctx)
+          if
+            item
+            and current_ctx.scope_root
+            and not scope.contains(current_ctx.scope_root, item.path)
+          then
+            return nil
+          end
+          return item
+        end,
+        ctx,
+        { max_results = refs_limit },
+        function(found)
+          if active(ctx) then
+            done(found)
+          end
         end
-        return item
-      end, ctx, { max_results = refs_limit }, function(found)
-        if active(ctx) then
-          done(found)
-        end
-      end)
+      )
     end)
   end
 
@@ -498,7 +531,8 @@ local function gather_references(ctx, push)
           return
         end
 
-        local merged = take(sorted(vim.list_extend(vim.list_extend({}, found), retried)), refs_limit)
+        local merged =
+          take(sorted(vim.list_extend(vim.list_extend({}, found), retried)), refs_limit)
         if #merged > 0 then
           push(sorted(vim.list_extend(merged, grep_found)))
           return
@@ -511,73 +545,90 @@ local function gather_references(ctx, push)
 end
 
 local function gather_callers(ctx, push)
-  request_all(ctx.bufnr, "textDocument/prepareCallHierarchy", current_params(ctx.bufnr), ctx, function(responses)
-    local items_for_clients = {}
-    for client_id, response in pairs(responses) do
-      if response and response.result and response.result[1] then
-        items_for_clients[#items_for_clients + 1] = {
-          client = vim.lsp.get_client_by_id(client_id),
-          item = response.result[1],
-        }
+  request_all(
+    ctx.bufnr,
+    "textDocument/prepareCallHierarchy",
+    current_params(ctx.bufnr),
+    ctx,
+    function(responses)
+      local items_for_clients = {}
+      for client_id, response in pairs(responses) do
+        if response and response.result and response.result[1] then
+          items_for_clients[#items_for_clients + 1] = {
+            client = vim.lsp.get_client_by_id(client_id),
+            item = response.result[1],
+          }
+        end
       end
-    end
 
-    if #items_for_clients == 0 then
-      push({})
-      return
-    end
-
-    local aggregate = {}
-    local remaining = #items_for_clients
-
-    local function finish()
-      remaining = remaining - 1
-      if remaining == 0 and active(ctx) then
-        push(aggregate)
+      if #items_for_clients == 0 then
+        push({})
+        return
       end
-    end
 
-    for _, entry in ipairs(items_for_clients) do
-      local client = entry.client
-      if not client then
-        finish()
-      else
-        local ok, request_id = client:request("callHierarchy/incomingCalls", { item = entry.item }, function(_, result)
-          if not active(ctx) then
-            return
-          end
+      local aggregate = {}
+      local remaining = #items_for_clients
 
-          local locations = {}
-          for _, call in ipairs(result or {}) do
-            local from = call.from
-            if from then
-              locations[#locations + 1] = {
-                uri = from.uri,
-                range = from.selectionRange or from.range,
-              }
-            end
-          end
+      local function finish()
+        remaining = remaining - 1
+        if remaining == 0 and active(ctx) then
+          push(aggregate)
+        end
+      end
 
-          process_locations(locations, function(location, current_ctx)
-            return location_item("calls", "caller", "CALL", 110, location, current_ctx)
-          end, ctx, {}, function(found)
-            if active(ctx) and #found > 0 then
-              vim.list_extend(aggregate, found)
-            end
-            finish()
-          end)
-        end, ctx.bufnr)
-
-        if ok and request_id then
-          register_cancel(ctx, function()
-            pcall(client.cancel_request, client, request_id)
-          end)
-        elseif not ok then
+      for _, entry in ipairs(items_for_clients) do
+        local client = entry.client
+        if not client then
           finish()
+        else
+          local ok, request_id = client:request(
+            "callHierarchy/incomingCalls",
+            { item = entry.item },
+            function(_, result)
+              if not active(ctx) then
+                return
+              end
+
+              local locations = {}
+              for _, call in ipairs(result or {}) do
+                local from = call.from
+                if from then
+                  locations[#locations + 1] = {
+                    uri = from.uri,
+                    range = from.selectionRange or from.range,
+                  }
+                end
+              end
+
+              process_locations(
+                locations,
+                function(location, current_ctx)
+                  return location_item("calls", "caller", "CALL", 110, location, current_ctx)
+                end,
+                ctx,
+                {},
+                function(found)
+                  if active(ctx) and #found > 0 then
+                    vim.list_extend(aggregate, found)
+                  end
+                  finish()
+                end
+              )
+            end,
+            ctx.bufnr
+          )
+
+          if ok and request_id then
+            register_cancel(ctx, function()
+              pcall(client.cancel_request, client, request_id)
+            end)
+          elseif not ok then
+            finish()
+          end
         end
       end
     end
-  end)
+  )
 end
 
 function M.collect(ctx, callback)

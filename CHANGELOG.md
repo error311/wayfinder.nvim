@@ -1,5 +1,17 @@
 # Changelog
 
+## v0.2.2 - 2026-05-06
+
+Saved Trails now remember the last Trail you worked with, and you can resume it explicitly when you come back to a project.
+
+- Added `:WayfinderTrailResume` to load the last active saved Trail for the current project.
+- Added `Resume Last Trail` to the in-picker Trail menu.
+- Saving, loading, cycling, renaming, and deleting saved Trails now keep the stored last-active Trail state correct.
+- `:checkhealth wayfinder` now reports the last active saved Trail when one is available.
+- Normal `:Wayfinder` opens still start normally; saved Trails are only resumed when you ask for them.
+
+---
+
 ## Changes 05/03/2026 (v0.2.1)
 
 `fix(v0.2.1): polish saved Trail status and preview context`

@@ -38,19 +38,51 @@ test("quickfix export preserves visible order and trail order", function()
   wayfinder.export_quickfix()
   local current_qf = vim.fn.getqflist()
   assert_ok(#current_qf == 2, "expected exported facet quickfix entries")
-  assert_ok(vim.api.nvim_buf_get_name(current_qf[1].bufnr) == file_b, "facet export should preserve visible order")
-  assert_ok(vim.api.nvim_buf_get_name(current_qf[2].bufnr) == file_a, "facet export should preserve visible order")
+  assert_ok(
+    vim.api.nvim_buf_get_name(current_qf[1].bufnr) == file_b,
+    "facet export should preserve visible order"
+  )
+  assert_ok(
+    vim.api.nvim_buf_get_name(current_qf[2].bufnr) == file_a,
+    "facet export should preserve visible order"
+  )
 
   trail.clear()
-  assert_ok(trail.pin({ id = "trail-a", label = "trail a", path = file_a, lnum = 1, col = 1, source = "lsp" }), "pin trail a")
-  assert_ok(trail.pin({ id = "trail-b", label = "trail b", path = file_b, lnum = 1, col = 1, source = "grep" }), "pin trail b")
+  assert_ok(
+    trail.pin({
+      id = "trail-a",
+      label = "trail a",
+      path = file_a,
+      lnum = 1,
+      col = 1,
+      source = "lsp",
+    }),
+    "pin trail a"
+  )
+  assert_ok(
+    trail.pin({
+      id = "trail-b",
+      label = "trail b",
+      path = file_b,
+      lnum = 1,
+      col = 1,
+      source = "grep",
+    }),
+    "pin trail b"
+  )
 
   state.current = nil
   wayfinder.export_trail_quickfix()
   local trail_qf = vim.fn.getqflist()
   assert_ok(#trail_qf == 2, "expected exported trail quickfix entries")
-  assert_ok(vim.api.nvim_buf_get_name(trail_qf[1].bufnr) == file_a, "trail export should preserve trail order")
-  assert_ok(vim.api.nvim_buf_get_name(trail_qf[2].bufnr) == file_b, "trail export should preserve trail order")
+  assert_ok(
+    vim.api.nvim_buf_get_name(trail_qf[1].bufnr) == file_a,
+    "trail export should preserve trail order"
+  )
+  assert_ok(
+    vim.api.nvim_buf_get_name(trail_qf[2].bufnr) == file_b,
+    "trail export should preserve trail order"
+  )
 
   layout.render = saved_render
   layout.focus_primary = saved_focus
@@ -137,14 +169,20 @@ test("facet switches restore the last selected item within the current session",
 
   actions.next_facet()
   assert_ok(state.current.facet == "tests", "expected switch into tests facet")
-  assert_ok(state.current.selection_id == "test-1", "expected new facet to start at first visible item")
+  assert_ok(
+    state.current.selection_id == "test-1",
+    "expected new facet to start at first visible item"
+  )
 
   actions.select_next()
   assert_ok(state.current.selection_id == "test-2", "expected test facet selection to move")
 
   actions.prev_facet()
   assert_ok(state.current.facet == "refs", "expected switch back into refs facet")
-  assert_ok(state.current.selection_id == "ref-2", "expected refs facet to restore its previous selection")
+  assert_ok(
+    state.current.selection_id == "ref-2",
+    "expected refs facet to restore its previous selection"
+  )
   assert_ok(state.current.selection_index == 2, "expected refs facet to restore its previous index")
 
   layout.render = saved_render
@@ -191,7 +229,10 @@ test("top bar shows saved Trail count even before the working Trail has items", 
   layout.render(session)
 
   local top_lines = vim.api.nvim_buf_get_lines(state.ui.top_buf, 0, -1, false)
-  assert_ok(string.find(top_lines[1] or "", "Trail %(2 saved%)", 1) ~= nil, "expected saved Trail count in top bar")
+  assert_ok(
+    string.find(top_lines[1] or "", "Trail %(2 saved%)", 1) ~= nil,
+    "expected saved Trail count in top bar"
+  )
 
   layout.close()
   trail_persistence.saved_count = saved_count

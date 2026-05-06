@@ -139,15 +139,30 @@ function M.rows(session)
     local badge_start, badge_end = find_range(line, badge, label_end)
     highlights[row] = {}
     if icon_start then
-      table.insert(highlights[row], { group = icon_group(item), start_col = icon_start, end_col = icon_end })
+      table.insert(
+        highlights[row],
+        { group = icon_group(item), start_col = icon_start, end_col = icon_end }
+      )
     end
     if label_start then
-      table.insert(highlights[row], { group = label_group(item), start_col = label_start, end_col = label_end })
+      table.insert(
+        highlights[row],
+        { group = label_group(item), start_col = label_start, end_col = label_end }
+      )
     end
     if badge ~= "" and badge_start and badge_end then
-      table.insert(highlights[row], { group = "WayfinderDim", start_col = badge_start, end_col = badge_start + 1 })
-      table.insert(highlights[row], { group = badge_group(item), start_col = badge_start + 1, end_col = badge_end - 1 })
-      table.insert(highlights[row], { group = "WayfinderDim", start_col = badge_end - 1, end_col = badge_end })
+      table.insert(
+        highlights[row],
+        { group = "WayfinderDim", start_col = badge_start, end_col = badge_start + 1 }
+      )
+      table.insert(
+        highlights[row],
+        { group = badge_group(item), start_col = badge_start + 1, end_col = badge_end - 1 }
+      )
+      table.insert(
+        highlights[row],
+        { group = "WayfinderDim", start_col = badge_end - 1, end_col = badge_end }
+      )
     end
 
     local secondary_parts = {}
@@ -165,7 +180,7 @@ function M.rows(session)
       secondary = item.detail or ""
     end
     secondary = item.source == "grep"
-      and text.truncate_middle(secondary, math.max(list_width - 4, 1))
+        and text.truncate_middle(secondary, math.max(list_width - 4, 1))
       or text.truncate_end(secondary, math.max(list_width - 4, 1))
 
     local pinned_icon = item.pinned and config.values.icons.pinned or " "
@@ -182,15 +197,33 @@ function M.rows(session)
     if selected then
       highlights[row - 1] = highlights[row - 1] or {}
       highlights[row] = highlights[row] or {}
-      table.insert(highlights[row - 1], { group = "WayfinderSelection", start_col = 2, end_col = -1 })
+      table.insert(
+        highlights[row - 1],
+        { group = "WayfinderSelection", start_col = 2, end_col = -1 }
+      )
       table.insert(highlights[row], { group = "WayfinderSelection", start_col = 2, end_col = -1 })
-      table.insert(highlights[row - 1], { group = "WayfinderSelectionAccent", start_col = 1, end_col = 2 })
-      table.insert(highlights[row], { group = "WayfinderSelectionAccent", start_col = 1, end_col = 2 })
-      table.insert(highlights[row - 1], { group = "WayfinderSelectionMuted", start_col = 3, end_col = -1 })
+      table.insert(
+        highlights[row - 1],
+        { group = "WayfinderSelectionAccent", start_col = 1, end_col = 2 }
+      )
+      table.insert(
+        highlights[row],
+        { group = "WayfinderSelectionAccent", start_col = 1, end_col = 2 }
+      )
+      table.insert(
+        highlights[row - 1],
+        { group = "WayfinderSelectionMuted", start_col = 3, end_col = -1 }
+      )
       if label_start then
-        table.insert(highlights[row - 1], { group = "WayfinderSelectionLabel", start_col = label_start, end_col = label_end })
+        table.insert(
+          highlights[row - 1],
+          { group = "WayfinderSelectionLabel", start_col = label_start, end_col = label_end }
+        )
       end
-      table.insert(highlights[row], { group = "WayfinderSelectionPath", start_col = 5, end_col = -1 })
+      table.insert(
+        highlights[row],
+        { group = "WayfinderSelectionPath", start_col = 5, end_col = -1 }
+      )
     end
   end
 

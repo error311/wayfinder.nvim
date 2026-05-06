@@ -25,7 +25,10 @@ test("tests source finds likely tests", function()
     }, done)
   end, function(items)
     assert_ok(#items > 0, "expected likely tests")
-    assert_ok(type(items[1].reason) == "string" and items[1].reason ~= "", "expected test match reason")
+    assert_ok(
+      type(items[1].reason) == "string" and items[1].reason ~= "",
+      "expected test match reason"
+    )
   end, {
     message = "tests source did not finish",
   })
@@ -195,8 +198,14 @@ test("package scope limits grep references to the nearest package", function()
       end, items)
       assert_ok(#grep_refs == 2, "expected text-match limit to apply")
       for _, item in ipairs(grep_refs) do
-        assert_ok(vim.startswith(item.path, monorepo_fixture.web_root .. "/"), "expected package-scoped text match")
-        assert_ok(not vim.startswith(item.path, monorepo_fixture.admin_root .. "/"), "expected admin package to be excluded")
+        assert_ok(
+          vim.startswith(item.path, monorepo_fixture.web_root .. "/"),
+          "expected package-scoped text match"
+        )
+        assert_ok(
+          not vim.startswith(item.path, monorepo_fixture.admin_root .. "/"),
+          "expected admin package to be excluded"
+        )
       end
     end, {
       message = "package-scoped grep fallback did not finish",
@@ -226,7 +235,10 @@ test("tests and git sources respect package scope and source limits", function()
     end, function(items)
       assert_ok(#items > 0, "expected package-scoped tests")
       for _, item in ipairs(items) do
-        assert_ok(vim.startswith(item.path, monorepo_fixture.web_root .. "/"), "expected tests to stay inside package scope")
+        assert_ok(
+          vim.startswith(item.path, monorepo_fixture.web_root .. "/"),
+          "expected tests to stay inside package scope"
+        )
       end
     end, {
       message = "tests source did not finish",

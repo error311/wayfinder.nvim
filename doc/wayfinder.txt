@@ -80,6 +80,10 @@ If no symbol is detected under the cursor, it falls back to the current file.
 :WayfinderTrailLoad
                 Load a saved Trail.
 
+                                            *:WayfinderTrailResume*
+:WayfinderTrailResume
+                Resume the last active saved Trail for the current project.
+
                                              *:WayfinderTrailDelete*
 :WayfinderTrailDelete
                 Delete a saved Trail.
@@ -187,6 +191,9 @@ Trail commands work outside the Wayfinder UI.
   :WayfinderTrailLoad
       Load a saved Trail into the current working Trail.
 
+  :WayfinderTrailResume
+      Load the most recently saved or loaded Trail for the current project.
+
   :WayfinderTrailDelete
       Delete a saved Trail entry.
 
@@ -196,6 +203,7 @@ Trail commands work outside the Wayfinder UI.
 Persistent named Trails are explicit:
 
   - pinning items does not automatically persist them
+  - normal :Wayfinder opens do not auto-load saved Trails
   - if you never save a Trail, ordinary Trail behavior stays the same
   - saved Trails are project-scoped and stored under Neovim state, not inside
     the repo
@@ -209,7 +217,7 @@ Inside Wayfinder:
       Open the current working Trail.
 
   S
-      Open the Trail menu for save/load/rename/delete actions.
+      Open the Trail menu for save/resume/load/rename/delete actions.
 
   [ / ]
       Cycle through saved Trails for the current project.
@@ -365,6 +373,7 @@ Health output includes:
   - saved Trail storage root
   - saved Trail storage file for the current project
   - saved Trail count for the current project
+  - last active saved Trail for the current project
   - current performance and scope.mode config
 
 vim:tw=78:ts=8:noet:ft=help:norl:

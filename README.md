@@ -15,7 +15,7 @@ From the current symbol or file, Wayfinder gathers the most relevant nearby code
 
 It opens as a centered 3-pane picker, loads sources progressively, and keeps the screen focused on facets, rows, badges, previews, and a Trail you can actually keep.
 
-Pin useful stops into Trail while you explore, then save that Trail per project and reload it later when you want the same path back.
+Pin useful stops into Trail while you explore, then save that Trail per project and resume the same path later.
 
 ![wayfinder motion](docs/media/wayfinder.gif)
 
@@ -34,6 +34,7 @@ Pin useful stops into Trail while you explore, then save that Trail per project 
 - Preview header with project-relative file context and line range
 - Trail facet for pinned breadcrumbs
 - Persistent named Trails per project
+- Explicit resume for the last active saved Trail
 - Async, cancelable LSP loading plus async tests and git loading
 - Local filter with negation and phrase matching
 - Jump actions
@@ -71,7 +72,7 @@ If there is no symbol under the cursor, it falls back to the current file.
 2. Move across `Calls`, `Refs`, `Tests`, `Git`, and `Trail`.
 3. Use preview to confirm the right match before jumping.
 4. Pin useful stops into Trail while exploring.
-5. Save or reload a Trail later if you want to keep that exploration path.
+5. Save, reload, or resume a Trail later if you want to keep that exploration path.
 
 ## Optional Setup
 
@@ -160,6 +161,7 @@ Trail:
 - `:WayfinderTrailSave`
 - `:WayfinderTrailSaveAs`
 - `:WayfinderTrailLoad`
+- `:WayfinderTrailResume`
 - `:WayfinderTrailDelete`
 - `:WayfinderTrailRename`
 
@@ -207,7 +209,7 @@ Core Trail actions:
 
 - `p` pins the current item
 - `P` opens the Trail facet
-- `S` opens the Trail menu for save/load/rename/delete actions
+- `S` opens the Trail menu for save/resume/load/rename/delete actions
 - `[` / `]` cycle through saved Trails for the current project
 - `dd` removes the selected Trail item
 - `da` clears the current Trail
@@ -220,15 +222,18 @@ Trail commands outside Wayfinder:
 - `:WayfinderTrailPrev` opens the previous Trail item
 - `:WayfinderTrailOpen` opens the current Trail item
 - `:WayfinderTrailShow` opens Wayfinder on the Trail facet
+- `:WayfinderTrailResume` loads the last active saved Trail for the current project
 
 Persistent named Trails:
 
 - saved Trails are project-scoped and stored under Neovim state, not in your repo
 - nothing persists automatically just because you pin items
+- normal `:Wayfinder` opens do not auto-load saved Trails
 - if you never save a Trail, ordinary Trail behavior stays the same
 - `:WayfinderTrailSave` saves the current working Trail
 - `:WayfinderTrailSaveAs` saves the current working Trail under a different name
 - `:WayfinderTrailLoad` loads a saved Trail back into the current working Trail
+- `:WayfinderTrailResume` loads the most recently saved or loaded Trail for this project
 - `:WayfinderTrailRename` renames a saved Trail
 - `:WayfinderTrailDelete` deletes a saved Trail entry
 - once a saved Trail is loaded, `Save Trail` updates that same saved Trail and `Save Trail As` creates a named variant
@@ -303,6 +308,7 @@ More demo notes are in [demo/README.md](demo/README.md).
 - saved Trail storage root
 - saved Trail storage file for the current project
 - saved Trail count for the current project
+- last active saved Trail for the current project
 - current `performance` and `scope.mode` config
 
 ```vim

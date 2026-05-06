@@ -5,7 +5,8 @@ local M = {}
 
 local function marker_root(path, cwd, markers, stop)
   local normalized = paths.normalize(path)
-  local start = normalized and vim.fn.isdirectory(normalized) == 1 and normalized or (normalized and vim.fs.dirname(normalized) or cwd)
+  local start = normalized and vim.fn.isdirectory(normalized) == 1 and normalized
+    or (normalized and vim.fs.dirname(normalized) or cwd)
   if not start or start == "" then
     return nil
   end
@@ -55,7 +56,12 @@ function M.resolve(path, cwd)
   elseif mode == "file_dir" then
     root = path and paths.normalize(vim.fs.dirname(path)) or cwd
   elseif mode == "package" then
-    package_root = marker_root(path, cwd, config.values.scope.package_markers, project_root or vim.uv.os_homedir())
+    package_root = marker_root(
+      path,
+      cwd,
+      config.values.scope.package_markers,
+      project_root or vim.uv.os_homedir()
+    )
     root = package_root or project_root or cwd
   else
     root = project_root or cwd
