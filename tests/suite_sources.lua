@@ -29,6 +29,11 @@ test("tests source finds likely tests", function()
       type(items[1].reason) == "string" and items[1].reason ~= "",
       "expected test match reason"
     )
+    assert_ok(items[1].lnum > 1, "expected likely test to target a relevant test block")
+    assert_ok(
+      items[1].label:find("createUser", 1, true) ~= nil,
+      "expected likely test label to show the matched test context"
+    )
   end, {
     message = "tests source did not finish",
   })
@@ -72,6 +77,33 @@ test("lsp source returns definitions references and callers", function()
     assert_ok(#items >= 4, "expected lsp results")
     assert_ok(facets.calls, "expected calls facet results")
     assert_ok(facets.refs, "expected refs facet results")
+  end, {
+    message = "lsp source did not finish",
+  })
+end)
+
+test("lsp source reports partial results before finalizing", function()
+  -- Guards progressive loading so useful LSP rows can render before the slowest LSP path completes.
+  local bufnr = open_typescript(fixture_root .. "/src/user_service.ts")
+  start_demo_lsp(bufnr, fixture_root)
+  vim.api.nvim_win_set_cursor(0, { 1, 18 })
+
+  local partials = {}
+  await_callback(function(done)
+    return lsp_source.collect({
+      bufnr = bufnr,
+      path = fixture_root .. "/src/user_service.ts",
+      cwd = fixture_root,
+      filetype = "typescript",
+      symbol = { text = "createUser" },
+      on_partial = function(items)
+        partials[#partials + 1] = items
+      end,
+    }, done)
+  end, function(items)
+    assert_ok(#items >= 4, "expected final lsp results")
+    assert_ok(#partials > 0, "expected at least one partial lsp update")
+    assert_ok(#partials[1] <= #items, "partial results should not exceed final result count")
   end, {
     message = "lsp source did not finish",
   })

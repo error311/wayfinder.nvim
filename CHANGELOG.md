@@ -1,5 +1,17 @@
 # Changelog
 
+## v0.2.3 - 2026-05-07
+
+Wayfinder's picker loop is smoother under slow backends and long status text.
+
+- LSP-backed rows can now update progressively while slower LSP work is still pending.
+- Git previews now ignore stale async callbacks when selection changes quickly.
+- Likely Tests rows now target a relevant test block or symbol mention instead of always opening at line 1.
+- Filtering still keeps the picker visible while updating results after the prompt completes.
+- The top bar and keyhint bar now budget long text so subject, filter, Trail, and reason labels do not overflow the Wayfinder frame.
+
+---
+
 ## v0.2.2 - 2026-05-06
 
 Saved Trails now remember the last Trail you worked with, and you can resume it explicitly when you come back to a project.

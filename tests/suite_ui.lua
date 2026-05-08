@@ -10,6 +10,8 @@ local trail = t.trail
 local trail_persistence = t.trail_persistence
 local fixture_root = t.fixture_root
 local open_typescript = t.open_typescript
+local preview = require("wayfinder.render.preview")
+local async = require("wayfinder.util.async")
 
 test("quickfix export preserves visible order and trail order", function()
   -- Guards quickfix export ordering for both the active facet and Trail.
@@ -226,6 +228,7 @@ test("top bar shows saved Trail count even before the working Trail has items", 
 
   state.current = session
   state.reset_trail_persistence()
+  state.notice = { text = nil, expires_at = 0 }
   layout.render(session)
 
   local top_lines = vim.api.nvim_buf_get_lines(state.ui.top_buf, 0, -1, false)
@@ -236,5 +239,144 @@ test("top bar shows saved Trail count even before the working Trail has items", 
 
   layout.close()
   trail_persistence.saved_count = saved_count
+  state.current = nil
+end)
+
+test("top bar fits available width with long status segments", function()
+  -- Guards the compact chrome so long subject/filter/reason/Trail text does not overflow the top bar.
+  local saved_count = trail_persistence.saved_count
+  ---@diagnostic disable-next-line: duplicate-set-field
+  trail_persistence.saved_count = function()
+    return 12
+  end
+
+  local session = {
+    mode = "symbol",
+    subject = "createUserWithAnExtremelyLongNameThatShouldNotTakeTheWholeTopBar",
+    path = fixture_root .. "/src/user_service.ts",
+    project_root = fixture_root,
+    cwd = fixture_root,
+    scope = { mode = "package", label = "package scope" },
+    facet = "refs",
+    filter = '"very long filter phrase" !generated',
+    selection_index = 1,
+    selection_id = "ref-1",
+    visible_items = {
+      {
+        id = "ref-1",
+        facet = "refs",
+        label = "reference",
+        path = fixture_root .. "/src/user_service.ts",
+        lnum = 1,
+        reason = "plain text fallback with a long explanation",
+      },
+    },
+    counts = {
+      all = 1,
+      calls = 0,
+      refs = 1,
+      tests = 0,
+      git = 0,
+      trail = 3,
+    },
+    loading = true,
+    show_details = false,
+    row_actions = {},
+    list_line_count = 0,
+  }
+
+  state.current = session
+  state.attach_saved_trail("long saved Trail name that should be truncated", {
+    project_root = fixture_root,
+    dirty = true,
+  })
+  layout.render(session)
+
+  local top_line = vim.api.nvim_buf_get_lines(state.ui.top_buf, 0, 1, false)[1] or ""
+  local top_width = vim.api.nvim_win_get_width(state.ui.top)
+  assert_ok(
+    vim.fn.strdisplaywidth(top_line) <= top_width,
+    "expected top bar text to fit inside its window"
+  )
+
+  layout.close()
+  trail_persistence.saved_count = saved_count
+  state.reset_trail_persistence()
+  state.current = nil
+end)
+
+test("git preview ignores stale async callbacks after selection changes", function()
+  -- Guards fast list movement so a slow git preview cannot overwrite the current file preview.
+  local root = vim.fs.normalize(vim.fn.tempname())
+  vim.fn.mkdir(root, "p")
+  local file = root .. "/current.ts"
+  vim.fn.writefile({
+    "export function currentPreview() {",
+    '  return "current";',
+    "}",
+  }, file)
+
+  local session = {
+    mode = "symbol",
+    subject = "currentPreview",
+    path = file,
+    project_root = root,
+    cwd = root,
+    selection_index = 1,
+    visible_items = {},
+  }
+  local git_item = {
+    id = "git-old",
+    source = "git",
+    path = file,
+    lnum = 1,
+    git = {
+      hash = "abcdef123456",
+      relative = "current.ts",
+      repo_root = root,
+    },
+  }
+  local file_item = {
+    id = "file-current",
+    source = "lsp",
+    path = file,
+    lnum = 1,
+    preview_range = { start = 1, ["end"] = 3 },
+  }
+  session.visible_items = { git_item, file_item }
+
+  local saved_system = async.system
+  local pending
+  ---@diagnostic disable-next-line: duplicate-set-field
+  async.system = function(_, _, callback)
+    pending = callback
+  end
+
+  state.current = session
+  layout.open()
+  preview.render(session, state.ui.preview, git_item)
+  assert_ok(type(pending) == "function", "expected git preview callback to be pending")
+
+  session.selection_index = 2
+  preview.render(session, state.ui.preview, file_item)
+  pending({
+    code = 0,
+    stdout = 'export const staleGitPreview = "stale";',
+    stderr = "",
+  })
+
+  local preview_lines =
+    table.concat(vim.api.nvim_buf_get_lines(state.ui.preview_buf, 0, -1, false), "\n")
+  assert_ok(
+    preview_lines:find("currentPreview", 1, true) ~= nil,
+    "expected current file preview to remain visible"
+  )
+  assert_ok(
+    preview_lines:find("staleGitPreview", 1, true) == nil,
+    "stale git preview should not overwrite the selected item preview"
+  )
+
+  async.system = saved_system
+  layout.close()
   state.current = nil
 end)

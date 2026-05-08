@@ -311,6 +311,26 @@ local function update_session(session, source_name, source_items)
   end
 end
 
+local function update_session_partial(session, source_name, source_items)
+  if state.current ~= session or session.closed then
+    return
+  end
+
+  session.results[source_name] = {
+    loading = true,
+    items = source_items or {},
+  }
+  aggregate_items(session)
+  if state.ui_suspended then
+    return
+  end
+  layout.render(session)
+  keymaps()
+  if layout.is_open() and not layout.interactive_window(vim.api.nvim_get_current_win()) then
+    layout.focus_primary()
+  end
+end
+
 local function load_source(session, target, symbol, source_name)
   if session.closed then
     return
@@ -334,6 +354,9 @@ local function load_source(session, target, symbol, source_name)
     symbol = symbol,
     is_stale = function()
       return session.closed or state.current ~= session
+    end,
+    on_partial = function(found)
+      update_session_partial(session, source_name, found or {})
     end,
   }, function(found)
     if session.closed or state.current ~= session then

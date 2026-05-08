@@ -326,13 +326,16 @@ Limits:
 
   Refs
       Split into LSP References and Text Matches.
+      LSP-backed rows can appear progressively while slower reference or
+      caller work is still loading.
       Text Matches can surface a small plain-text fallback reason in the top
       bar for the current selection.
 
   Tests
       Heuristic likely-test matches for the file or symbol.
-      Test matches can surface a small heuristic reason such as filename or
-      symbol text matching.
+      Test rows target a likely test block or symbol mention when possible.
+      Test matches can surface a small heuristic reason such as filename,
+      test-block, or symbol text matching.
 
   Git
       Recent commits touching the current file.

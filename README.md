@@ -35,7 +35,7 @@ Pin useful stops into Trail while you explore, then save that Trail per project 
 - Trail facet for pinned breadcrumbs
 - Persistent named Trails per project
 - Explicit resume for the last active saved Trail
-- Async, cancelable LSP loading plus async tests and git loading
+- Progressive, cancelable LSP loading plus async tests and git loading
 - Local filter with negation and phrase matching
 - Jump actions
 
@@ -262,9 +262,11 @@ Quickfix export:
 
 - `Calls` shows LSP definitions and callers
 - `Refs` is split into `LSP References` and `Text Matches`
+- LSP-backed rows can appear progressively while slower reference/caller work is still loading
 - weak-source reasons now show up in the top bar for the current selection
 - `Tests` is heuristic and intentionally ranked below calls and refs
-- `Tests` can show a small heuristic reason like filename or symbol-text matching
+- `Tests` targets a likely test block or symbol mention when it can find one
+- `Tests` can show a small heuristic reason like filename, test-block, or symbol-text matching
 - `Git` shows recent commits touching the current file
 - `Git` can show a small file-touch reason while commit metadata stays in details
 

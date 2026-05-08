@@ -833,7 +833,7 @@ function M.filter()
     prompt = "Wayfinder filter: ",
     default = session.filter,
   }, function(input)
-    if input == nil then
+    if input == nil or state.current ~= session or session.closed then
       return
     end
     session.filter = input

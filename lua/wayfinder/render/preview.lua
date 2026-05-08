@@ -206,13 +206,24 @@ local function render_file_preview(session, item)
   render_lines(session, item, vim.filetype.match({ filename = item.path }) or "", lines, start_line)
 end
 
-local function render_git_preview(session, item)
+local function selected_item_id(session)
+  local selected = session
+    and session.visible_items
+    and session.visible_items[session.selection_index]
+  return selected and selected.id or nil
+end
+
+local function render_git_preview(session, item, token)
   async.system({
     "git",
     "show",
     string.format("%s:%s", item.git.hash, item.git.relative),
   }, { cwd = item.git.repo_root }, function(result)
-    if state.current ~= session then
+    if
+      state.current ~= session
+      or session.preview_token ~= token
+      or selected_item_id(session) ~= item.id
+    then
       return
     end
 
@@ -230,6 +241,9 @@ end
 
 function M.render(session, winid, item)
   ensure_buffer()
+  session.preview_token = (session.preview_token or 0) + 1
+  local token = session.preview_token
+
   if not item then
     render_lines(session, nil, "", {
       "  Pick an item to preview",
@@ -245,7 +259,7 @@ function M.render(session, winid, item)
       "",
       "  Wayfinder is fetching the selected revision.",
     })
-    render_git_preview(session, item)
+    render_git_preview(session, item, token)
     return
   end
 

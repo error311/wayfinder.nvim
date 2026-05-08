@@ -6,6 +6,7 @@ local preview = require("wayfinder.render.preview")
 local trail_persistence = require("wayfinder.trail_persistence")
 local debounce = require("wayfinder.util.debounce")
 local paths = require("wayfinder.util.paths")
+local text_util = require("wayfinder.util.text")
 
 local M = {}
 
@@ -115,6 +116,43 @@ local function add_substring_highlights(bufnr, line_nr, line, ranges, group, pri
       priority = priority + 1
     end
   end
+end
+
+local function fit_segments(segments, max_width)
+  local fitted = {}
+  local used = 0
+
+  for _, segment in ipairs(segments) do
+    local value = segment.text or ""
+    local width = vim.fn.strdisplaywidth(value)
+    local remaining = max_width - used
+    if remaining <= 0 then
+      break
+    end
+
+    if width <= remaining then
+      fitted[#fitted + 1] = segment
+      used = used + width
+    elseif segment.truncate then
+      local truncated = segment.truncate == "middle" and text_util.truncate_middle(value, remaining)
+        or text_util.truncate_end(value, remaining)
+      if truncated ~= "" then
+        fitted[#fitted + 1] = vim.tbl_extend("force", segment, { text = truncated })
+      end
+      break
+    else
+      break
+    end
+  end
+
+  return fitted
+end
+
+local function fit_line(value, max_width)
+  if vim.fn.strdisplaywidth(value or "") <= max_width then
+    return value
+  end
+  return text_util.truncate_end(value, max_width)
 end
 
 local function clear_ui()
@@ -542,49 +580,55 @@ function M.render(session)
   local filter_label = session.filter ~= "" and ("/" .. session.filter) or nil
   local selected_item = session.visible_items[session.selection_index]
   local reason_label = selected_item and selected_item.reason or nil
+  local top_width = state.ui.top
+      and vim.api.nvim_win_is_valid(state.ui.top)
+      and vim.api.nvim_win_get_width(state.ui.top)
+    or 80
   local top_segments = {
-    { text = " " .. mode_label, group = "WayfinderHeader" },
+    { text = " " .. mode_label, group = "WayfinderHeader", truncate = "end" },
     { text = separator },
-    { text = subject, group = "WayfinderTitle" },
+    { text = subject, group = "WayfinderTitle", truncate = "middle" },
   }
 
-  if source_file and source_file ~= "" and source_file ~= subject then
-    table.insert(top_segments, { text = separator })
-    table.insert(top_segments, { text = source_file, group = "WayfinderPath" })
-  end
-
   table.insert(top_segments, { text = separator })
-  table.insert(top_segments, { text = count_label, group = "WayfinderCount" })
+  table.insert(top_segments, { text = count_label, group = "WayfinderCount", truncate = "end" })
 
   if scope_label then
     table.insert(top_segments, { text = separator })
-    table.insert(top_segments, { text = scope_label, group = "WayfinderDim" })
+    table.insert(top_segments, { text = scope_label, group = "WayfinderDim", truncate = "end" })
   end
 
   if loading_label then
     table.insert(top_segments, { text = separator })
-    table.insert(top_segments, { text = loading_label, group = "WayfinderDim" })
-  end
-  if filter_label then
-    table.insert(top_segments, { text = separator })
-    table.insert(top_segments, { text = filter_label, group = "WayfinderDim" })
-  end
-  if reason_label then
-    table.insert(top_segments, { text = separator })
-    table.insert(top_segments, { text = reason_label, group = "WayfinderDim" })
+    table.insert(top_segments, { text = loading_label, group = "WayfinderDim", truncate = "end" })
   end
   if notice then
     table.insert(top_segments, { text = separator })
-    table.insert(top_segments, { text = notice, group = "WayfinderTrail" })
+    table.insert(top_segments, { text = notice, group = "WayfinderTrail", truncate = "end" })
   elseif trail_label then
     table.insert(top_segments, { text = separator })
-    table.insert(top_segments, { text = trail_label, group = "WayfinderTrail" })
+    table.insert(
+      top_segments,
+      { text = trail_label, group = "WayfinderTrail", truncate = "middle" }
+    )
+  end
+  if filter_label then
+    table.insert(top_segments, { text = separator })
+    table.insert(top_segments, { text = filter_label, group = "WayfinderDim", truncate = "middle" })
+  end
+  if reason_label then
+    table.insert(top_segments, { text = separator })
+    table.insert(top_segments, { text = reason_label, group = "WayfinderDim", truncate = "end" })
+  end
+  if source_file and source_file ~= "" and source_file ~= subject then
+    table.insert(top_segments, { text = separator })
+    table.insert(top_segments, { text = source_file, group = "WayfinderPath", truncate = "middle" })
   end
 
   local top_line = ""
   local top_highlights = {}
   local byte_index = 0
-  for _, segment in ipairs(top_segments) do
+  for _, segment in ipairs(fit_segments(top_segments, top_width)) do
     local start_col = byte_index
     top_line = top_line .. segment.text
     byte_index = byte_index + #segment.text
@@ -622,9 +666,16 @@ function M.render(session)
   sync_list_cursor(session)
 
   local bottom_lines = {
-    " <CR> jump   j/k move   h/l facets   <Tab>/<S-Tab> cycle   gg/G ends   <C-u>/<C-d> page ",
-    " p pin   P trail   S trail menu   [] saved trails   x export   dd remove   da clear   D details   / filter   q close ",
+    " <CR> jump  j/k move  h/l facets  <Tab>/<S-Tab> cycle  gg/G ends  <C-u>/<C-d> page ",
+    " p pin  P trail  S menu  [] saved  x qf  dd remove  da clear  D details  / filter  q close ",
   }
+  local bottom_width = state.ui.bottom
+      and vim.api.nvim_win_is_valid(state.ui.bottom)
+      and vim.api.nvim_win_get_width(state.ui.bottom)
+    or top_width
+  bottom_lines = vim.tbl_map(function(line)
+    return fit_line(line, bottom_width)
+  end, bottom_lines)
   set_lines(state.ui.bottom_buf, bottom_lines)
   vim.api.nvim_buf_clear_namespace(state.ui.bottom_buf, highlight_ns, 0, -1)
   for line = 0, #bottom_lines - 1 do

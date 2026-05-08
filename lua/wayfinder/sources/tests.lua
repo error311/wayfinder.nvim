@@ -62,6 +62,65 @@ local function score(path, ctx)
   return score_value, reasons
 end
 
+local function line_has_test_keyword(line)
+  return line:find("describe%s*%(", 1) ~= nil
+    or line:find("it%s*%(", 1) ~= nil
+    or line:find("test%s*%(", 1) ~= nil
+    or line:find("def%s+test_", 1) ~= nil
+    or line:find("function%s+test_", 1) ~= nil
+end
+
+local function target_line(path, ctx)
+  local ok, lines = pcall(vim.fn.readfile, path, "", 250)
+  if not ok or #lines == 0 then
+    return 1, paths.basename(path), "heuristic match"
+  end
+
+  local symbol = ctx.symbol and ctx.symbol.text and ctx.symbol.text:lower() or nil
+  local basename = paths.basename(ctx.path or ""):gsub("%..+$", ""):lower()
+  local best = nil
+  local first_nonempty = nil
+
+  for lnum, raw in ipairs(lines) do
+    local line = text.one_line(raw)
+    if line ~= "" and not first_nonempty then
+      first_nonempty = { lnum = lnum, label = line, reason = "test file" }
+    end
+
+    local lower = line:lower()
+    local score_value = 0
+    local reason = nil
+    local has_test_keyword = line_has_test_keyword(line)
+
+    if symbol and lower:find(symbol, 1, true) then
+      score_value = score_value + 60
+      reason = has_test_keyword and "symbol test block" or "symbol text match"
+    end
+    if basename ~= "" and lower:find(basename, 1, true) then
+      score_value = score_value + 25
+      reason = reason or "filename text match"
+    end
+    if has_test_keyword then
+      score_value = score_value + 35
+      reason = reason or "test block"
+    end
+
+    if score_value > 0 and (not best or score_value > best.score) then
+      best = {
+        score = score_value,
+        lnum = lnum,
+        label = line,
+        reason = reason or "heuristic match",
+      }
+    end
+  end
+
+  local picked = best
+    or first_nonempty
+    or { lnum = 1, label = paths.basename(path), reason = "test file" }
+  return picked.lnum, picked.label, picked.reason
+end
+
 function M.collect(ctx, callback)
   file_candidates(ctx, function(candidates)
     local results = {}
@@ -71,21 +130,22 @@ function M.collect(ctx, callback)
       if path ~= ctx.path then
         local score_value, reasons = score(path, ctx)
         if score_value > 0 then
+          local lnum, label, target_reason = target_line(path, ctx)
           table.insert(results, {
             id = items.item_id({ "test", path }),
             facet = "tests",
             kind = "test",
-            label = text.line_at(path, 1) ~= "" and text.line_at(path, 1) or paths.basename(path),
+            label = label,
             path = path,
-            lnum = 1,
+            lnum = lnum,
             col = 1,
-            preview_range = { start = 1, ["end"] = 8 },
+            preview_range = { start = lnum, ["end"] = lnum + 8 },
             source = "test",
             score = 10 + math.floor(score_value / 2),
             badge = "TEST",
             detail = paths.display(path, ctx.project_root),
             secondary = paths.display(path, ctx.project_root),
-            reason = reasons[1] or "heuristic match",
+            reason = target_reason or reasons[1] or "heuristic match",
             group = "Likely Tests",
             icon = config.values.icons.tests,
           })

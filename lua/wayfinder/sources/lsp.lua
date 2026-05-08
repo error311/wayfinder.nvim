@@ -680,6 +680,9 @@ function M.collect(ctx, callback)
 
     if part and #part > 0 then
       vim.list_extend(results, part)
+      if ctx.on_partial and active(control) then
+        ctx.on_partial(sorted(results))
+      end
     end
 
     pending = pending - 1
