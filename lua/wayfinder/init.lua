@@ -52,12 +52,55 @@ local function source_key(target, symbol)
     target.path or "",
     target.filetype or "",
     symbol and symbol.text or "",
+    target.position and target.position.lnum or "",
+    target.position and target.position.col or "",
     target.scope and target.scope.mode or "",
     target.scope and target.scope.root or "",
   }, "|")
 end
 
-local function target_context()
+local function attach_clients(from_bufnr, to_bufnr)
+  if not from_bufnr or not to_bufnr or from_bufnr == to_bufnr or not vim.lsp then
+    return
+  end
+
+  for _, client in ipairs(vim.lsp.get_clients({ bufnr = from_bufnr })) do
+    pcall(vim.lsp.buf_attach_client, to_bufnr, client.id)
+  end
+end
+
+local function target_context(opts)
+  opts = opts or {}
+  if opts.item and opts.item.path and opts.item.path ~= "" then
+    local path = vim.fs.normalize(opts.item.path)
+    local bufnr = vim.fn.bufnr(path)
+    if bufnr < 1 then
+      bufnr = vim.fn.bufadd(path)
+    end
+    if bufnr > 0 then
+      vim.fn.bufload(bufnr)
+      if vim.bo[bufnr].filetype == "" then
+        vim.bo[bufnr].filetype = vim.filetype.match({ filename = path }) or ""
+      end
+      attach_clients(opts.from_bufnr, bufnr)
+    end
+
+    local cwd = opts.cwd or vim.uv.cwd()
+    local resolved_scope = scope.resolve(path, cwd)
+    return {
+      bufnr = bufnr,
+      path = path,
+      filetype = bufnr > 0 and vim.bo[bufnr].filetype or "",
+      cwd = cwd,
+      project_root = resolved_scope.project_root,
+      scope = resolved_scope,
+      position = opts.item.lnum and opts.item.col and {
+        lnum = opts.item.lnum,
+        col = opts.item.col,
+      } or nil,
+    }
+  end
+
   local bufnr = vim.api.nvim_get_current_buf()
   local path = vim.api.nvim_buf_get_name(bufnr)
   local cwd = vim.uv.cwd()
@@ -203,6 +246,7 @@ local function keymaps()
       map("<Tab>", actions.next_facet)
       map("<S-Tab>", actions.prev_facet)
       map("<CR>", actions.jump)
+      map("e", actions.explore_selection)
       map("s", actions.open_split)
       map("v", actions.open_vsplit)
       map("t", actions.open_tab)
@@ -227,12 +271,15 @@ local function keymaps()
   end
 end
 
-local function create_session()
-  local target = target_context()
-  local symbol = symbol_util.detect()
+local function create_session(opts)
+  opts = opts or {}
+  local target = target_context(opts)
+  local symbol = target.position
+      and symbol_util.detect_at(target.path, target.position.lnum, target.position.col)
+    or symbol_util.detect()
   local session = {
     id = state.next_id(),
-    origin_win = vim.api.nvim_get_current_win(),
+    origin_win = opts.origin_win or vim.api.nvim_get_current_win(),
     mode = symbol and "symbol" or "file",
     subject = symbol and symbol.text or vim.fs.basename(target.path or ""),
     symbol = symbol,
@@ -242,6 +289,7 @@ local function create_session()
     scope = target.scope,
     filetype = target.filetype,
     bufnr = target.bufnr,
+    position = target.position,
     facet = symbol and "calls" or "all",
     auto_facet_pending = symbol ~= nil,
     filter = "",
@@ -351,6 +399,7 @@ local function load_source(session, target, symbol, source_name)
     scope = target.scope,
     scope_root = target.scope and target.scope.root or nil,
     filetype = target.filetype,
+    position = target.position,
     symbol = symbol,
     is_stale = function()
       return session.closed or state.current ~= session
@@ -376,9 +425,10 @@ function M.setup(opts)
   highlights.setup()
 end
 
-local function open_session(facet)
+local function open_session(facet, opts)
+  opts = opts or {}
   cancel_session(state.current)
-  local session, target = create_session()
+  local session, target = create_session(opts)
   if facet then
     session.facet = facet
     session.auto_facet_pending = false
@@ -400,6 +450,34 @@ end
 
 function M.open()
   open_session()
+end
+
+function M.explore(item)
+  local current = state.current
+  if not current or not item or not item.path or item.path == "" then
+    vim.notify("Wayfinder: No explorable item selected", vim.log.levels.INFO)
+    return
+  end
+  if item.source == "git" or item.kind == "commit" then
+    vim.notify("Wayfinder: Git rows are file history, not code locations", vim.log.levels.INFO)
+    return
+  end
+
+  local path = vim.fs.normalize(item.path)
+  if not path or vim.uv.fs_stat(path) == nil then
+    vim.notify("Wayfinder: Selected item is no longer available", vim.log.levels.WARN)
+    return
+  end
+
+  local symbol = item.lnum and item.col and symbol_util.detect_at(path, item.lnum, item.col) or nil
+  local label = symbol and symbol.text or vim.fs.basename(path)
+  state.set_notice("Exploring " .. label, 1400)
+  open_session(nil, {
+    item = vim.tbl_extend("force", item, { path = path }),
+    origin_win = current.origin_win,
+    cwd = current.cwd,
+    from_bufnr = current.bufnr,
+  })
 end
 
 function M.export_quickfix()

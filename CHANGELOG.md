@@ -1,5 +1,17 @@
 # Changelog
 
+## v0.2.4 - 2026-05-09
+
+Wayfinder can now pivot from a selected code result and gather connected code from that location without leaving the picker.
+
+- Added `e` inside Wayfinder to explore from the selected code result.
+- Exploring cancels stale source work, re-roots the session on the selected file location, and starts gathering again.
+- Existing Trail items stay intact; exploring does not auto-pin or auto-switch to Trail.
+- Git history rows are not explorable because they describe commits rather than precise code locations.
+- LSP-backed exploration can reuse clients already attached to the previous buffer when pivoting to another loaded file.
+
+---
+
 ## v0.2.3 - 2026-05-07
 
 Wayfinder's picker loop is smoother under slow backends and long status text.

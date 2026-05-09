@@ -380,3 +380,96 @@ test("git preview ignores stale async callbacks after selection changes", functi
   layout.close()
   state.current = nil
 end)
+
+test("explore selected item re-roots the session without changing Trail", function()
+  -- Guards the explicit exploration pivot so users can walk connected code without auto-pinning.
+  local bufnr = open_typescript(fixture_root .. "/src/user_service.ts")
+  t.start_demo_lsp(bufnr, fixture_root)
+  vim.api.nvim_win_set_cursor(0, { 1, 18 })
+  trail.clear()
+  assert_ok(
+    trail.pin({
+      id = "trail-create-user",
+      label = "createUser",
+      path = fixture_root .. "/src/user_service.ts",
+      lnum = 1,
+      col = 17,
+      source = "lsp",
+    }),
+    "pin initial trail item"
+  )
+
+  wayfinder.open()
+  wayfinder.explore({
+    id = "target-find-user",
+    label = "export function findUser(id: string) {",
+    path = fixture_root .. "/src/user_service.ts",
+    lnum = 8,
+    col = 18,
+    source = "lsp",
+  })
+
+  assert_ok(state.current ~= nil, "expected active Wayfinder session after explore")
+  assert_ok(state.current.subject == "findUser", "expected explore to re-root on target symbol")
+  assert_ok(
+    state.notice.text == "Exploring findUser",
+    "explore notice should use the detected symbol, not the full row label"
+  )
+  assert_ok(state.current.facet == "calls", "expected symbol explore to start on Calls")
+  assert_ok(#trail.items() == 1, "explore should not mutate Trail")
+  assert_ok(
+    trail.items()[1].id == "trail-create-user",
+    "explore should preserve existing Trail items"
+  )
+
+  t.await(function()
+    return state.current and state.current.loading == false
+  end, 2000, "explored session did not finish loading")
+
+  local facets = {}
+  for _, item in ipairs(state.current.items) do
+    facets[item.facet] = true
+  end
+  assert_ok(facets.calls, "expected explored session to gather calls")
+  assert_ok(facets.refs, "expected explored session to gather refs")
+
+  layout.close()
+  if state.current and state.current.cancel then
+    state.current:cancel()
+  end
+  state.current = nil
+end)
+
+test("explore ignores git history rows because they are not code locations", function()
+  -- Guards exploration so file-history rows do not accidentally pivot on the first word of a file.
+  local root = vim.fs.normalize(vim.fn.tempname())
+  vim.fn.mkdir(root, "p")
+  local file = root .. "/service.ts"
+  vim.fn.writefile({
+    "export function createUser() {",
+    "  return true;",
+    "}",
+  }, file)
+
+  state.current = {
+    subject = "createUser",
+    path = file,
+    cwd = root,
+    project_root = root,
+    bufnr = vim.api.nvim_get_current_buf(),
+    origin_win = vim.api.nvim_get_current_win(),
+  }
+
+  wayfinder.explore({
+    id = "git-row",
+    source = "git",
+    kind = "commit",
+    label = "fixture commit",
+    path = file,
+    lnum = 1,
+    col = 1,
+  })
+
+  assert_ok(state.current.subject == "createUser", "git row explore should leave session unchanged")
+  state.current = nil
+end)

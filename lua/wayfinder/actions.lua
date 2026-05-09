@@ -470,6 +470,10 @@ function M.open_tab()
   open_item(selection_item(), "tab")
 end
 
+function M.explore_selection()
+  require("wayfinder").explore(selection_item())
+end
+
 function M.pin()
   local item = selection_item()
   if item and trail.pin(item) then

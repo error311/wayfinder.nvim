@@ -63,11 +63,11 @@ local function score(path, ctx)
 end
 
 local function line_has_test_keyword(line)
-  return line:find("describe%s*%(", 1) ~= nil
-    or line:find("it%s*%(", 1) ~= nil
-    or line:find("test%s*%(", 1) ~= nil
-    or line:find("def%s+test_", 1) ~= nil
-    or line:find("function%s+test_", 1) ~= nil
+  return line:find("describe%s*%(", 1)
+    or line:find("it%s*%(", 1)
+    or line:find("test%s*%(", 1)
+    or line:find("def%s+test_", 1)
+    or line:find("function%s+test_", 1)
 end
 
 local function target_line(path, ctx)
@@ -84,31 +84,38 @@ local function target_line(path, ctx)
   for lnum, raw in ipairs(lines) do
     local line = text.one_line(raw)
     if line ~= "" and not first_nonempty then
-      first_nonempty = { lnum = lnum, label = line, reason = "test file" }
+      first_nonempty = { lnum = lnum, col = 1, label = line, reason = "test file" }
     end
 
     local lower = line:lower()
     local score_value = 0
     local reason = nil
-    local has_test_keyword = line_has_test_keyword(line)
+    local target_col = 1
+    local test_keyword_col = line_has_test_keyword(line)
 
-    if symbol and lower:find(symbol, 1, true) then
+    local symbol_col = symbol and lower:find(symbol, 1, true) or nil
+    if symbol_col then
       score_value = score_value + 60
-      reason = has_test_keyword and "symbol test block" or "symbol text match"
+      reason = test_keyword_col and "symbol test block" or "symbol text match"
+      target_col = symbol_col
     end
-    if basename ~= "" and lower:find(basename, 1, true) then
+    local basename_col = basename ~= "" and lower:find(basename, 1, true) or nil
+    if basename_col then
       score_value = score_value + 25
       reason = reason or "filename text match"
+      target_col = target_col == 1 and basename_col or target_col
     end
-    if has_test_keyword then
+    if test_keyword_col then
       score_value = score_value + 35
       reason = reason or "test block"
+      target_col = target_col == 1 and test_keyword_col or target_col
     end
 
     if score_value > 0 and (not best or score_value > best.score) then
       best = {
         score = score_value,
         lnum = lnum,
+        col = target_col,
         label = line,
         reason = reason or "heuristic match",
       }
@@ -118,7 +125,7 @@ local function target_line(path, ctx)
   local picked = best
     or first_nonempty
     or { lnum = 1, label = paths.basename(path), reason = "test file" }
-  return picked.lnum, picked.label, picked.reason
+  return picked.lnum, picked.col or 1, picked.label, picked.reason
 end
 
 function M.collect(ctx, callback)
@@ -130,7 +137,7 @@ function M.collect(ctx, callback)
       if path ~= ctx.path then
         local score_value, reasons = score(path, ctx)
         if score_value > 0 then
-          local lnum, label, target_reason = target_line(path, ctx)
+          local lnum, col, label, target_reason = target_line(path, ctx)
           table.insert(results, {
             id = items.item_id({ "test", path }),
             facet = "tests",
@@ -138,7 +145,7 @@ function M.collect(ctx, callback)
             label = label,
             path = path,
             lnum = lnum,
-            col = 1,
+            col = col,
             preview_range = { start = lnum, ["end"] = lnum + 8 },
             source = "test",
             score = 10 + math.floor(score_value / 2),

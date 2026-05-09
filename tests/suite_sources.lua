@@ -30,6 +30,7 @@ test("tests source finds likely tests", function()
       "expected test match reason"
     )
     assert_ok(items[1].lnum > 1, "expected likely test to target a relevant test block")
+    assert_ok(items[1].col > 1, "expected likely test to target the matched symbol column")
     assert_ok(
       items[1].label:find("createUser", 1, true) ~= nil,
       "expected likely test label to show the matched test context"

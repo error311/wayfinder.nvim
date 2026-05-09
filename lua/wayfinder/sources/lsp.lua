@@ -61,9 +61,19 @@ local function take(found, max_results)
   return out
 end
 
-local function current_params(bufnr)
-  local client = vim.lsp.get_clients({ bufnr = bufnr })[1]
-  local winid = vim.fn.bufwinid(bufnr)
+local function current_params(ctx)
+  if ctx.position then
+    return {
+      textDocument = vim.lsp.util.make_text_document_params(ctx.bufnr),
+      position = {
+        line = math.max((ctx.position.lnum or 1) - 1, 0),
+        character = math.max((ctx.position.col or 1) - 1, 0),
+      },
+    }
+  end
+
+  local client = vim.lsp.get_clients({ bufnr = ctx.bufnr })[1]
+  local winid = vim.fn.bufwinid(ctx.bufnr)
   if winid == -1 then
     winid = vim.api.nvim_get_current_win()
   end
@@ -459,27 +469,21 @@ local function grep_references(ctx, callback)
 end
 
 local function gather_definitions(ctx, push)
-  request_all(
-    ctx.bufnr,
-    "textDocument/definition",
-    current_params(ctx.bufnr),
-    ctx,
-    function(responses)
-      process_response_locations(
-        responses,
-        function(location, current_ctx)
-          return location_item("calls", "definition", "DEF", 120, location, current_ctx)
-        end,
-        ctx,
-        {},
-        function(found)
-          if active(ctx) then
-            push(found)
-          end
+  request_all(ctx.bufnr, "textDocument/definition", current_params(ctx), ctx, function(responses)
+    process_response_locations(
+      responses,
+      function(location, current_ctx)
+        return location_item("calls", "definition", "DEF", 120, location, current_ctx)
+      end,
+      ctx,
+      {},
+      function(found)
+        if active(ctx) then
+          push(found)
         end
-      )
-    end
-  )
+      end
+    )
+  end)
 end
 
 local function gather_references(ctx, push)
@@ -487,7 +491,7 @@ local function gather_references(ctx, push)
 
   local function collect(include_declaration, done)
     ---@type lsp.ReferenceParams
-    local params = vim.tbl_extend("force", current_params(ctx.bufnr), {
+    local params = vim.tbl_extend("force", current_params(ctx), {
       context = { includeDeclaration = include_declaration },
     })
 
@@ -548,7 +552,7 @@ local function gather_callers(ctx, push)
   request_all(
     ctx.bufnr,
     "textDocument/prepareCallHierarchy",
-    current_params(ctx.bufnr),
+    current_params(ctx),
     ctx,
     function(responses)
       local items_for_clients = {}

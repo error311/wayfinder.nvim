@@ -666,7 +666,7 @@ function M.render(session)
   sync_list_cursor(session)
 
   local bottom_lines = {
-    " <CR> jump  j/k move  h/l facets  <Tab>/<S-Tab> cycle  gg/G ends  <C-u>/<C-d> page ",
+    " <CR> jump  e explore  j/k move  h/l facets  <Tab>/<S-Tab> cycle  gg/G ends  <C-u>/<C-d> page ",
     " p pin  P trail  S menu  [] saved  x qf  dd remove  da clear  D details  / filter  q close ",
   }
   local bottom_width = state.ui.bottom
@@ -685,7 +685,7 @@ function M.render(session)
     state.ui.bottom_buf,
     0,
     bottom_lines[1],
-    { "<CR>", "j/k", "gg/G", "<C-u>/<C-d>", "h/l", "<Tab>", "<S-Tab>" },
+    { "<CR>", "e", "j/k", "gg/G", "<C-u>/<C-d>", "h/l", "<Tab>", "<S-Tab>" },
     "WayfinderHeader",
     200
   )
