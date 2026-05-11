@@ -1,5 +1,16 @@
 # Changelog
 
+## v0.2.5 - 2026-05-11
+
+Explore pivots are now reversible inside the picker.
+
+- Added `b` / `f` inside Wayfinder to move backward and forward through explore history.
+- Explore history is session-local and separate from Trail; it does not save, load, pin, or mutate Trail items.
+- The top bar now shows compact explore history state, using `Original` at the root target and `Back N` after pivots.
+- Opening a new Wayfinder session starts with clean explore history.
+
+---
+
 ## v0.2.4 - 2026-05-09
 
 Wayfinder can now pivot from a selected code result and gather connected code from that location without leaving the picker.

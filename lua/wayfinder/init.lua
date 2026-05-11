@@ -94,6 +94,7 @@ local function target_context(opts)
       cwd = cwd,
       project_root = resolved_scope.project_root,
       scope = resolved_scope,
+      explicit_position = true,
       position = opts.item.lnum and opts.item.col and {
         lnum = opts.item.lnum,
         col = opts.item.col,
@@ -106,6 +107,7 @@ local function target_context(opts)
   local cwd = vim.uv.cwd()
   local normalized_path = path ~= "" and vim.fs.normalize(path) or nil
   local resolved_scope = scope.resolve(normalized_path, cwd)
+  local cursor = vim.api.nvim_win_get_cursor(0)
 
   return {
     bufnr = bufnr,
@@ -114,6 +116,35 @@ local function target_context(opts)
     cwd = cwd,
     project_root = resolved_scope.project_root,
     scope = resolved_scope,
+    position = normalized_path and {
+      lnum = cursor[1],
+      col = cursor[2] + 1,
+    } or nil,
+  }
+end
+
+local function history_state(history)
+  history = history or {}
+  return {
+    back = vim.deepcopy(history.back or {}),
+    forward = vim.deepcopy(history.forward or {}),
+  }
+end
+
+local function context_from_session(session)
+  if not session or not session.path or session.path == "" then
+    return nil
+  end
+
+  return {
+    item = {
+      path = session.path,
+      lnum = session.position and session.position.lnum or nil,
+      col = session.position and session.position.col or nil,
+    },
+    label = session.subject,
+    cwd = session.cwd,
+    from_bufnr = session.bufnr,
   }
 end
 
@@ -247,6 +278,8 @@ local function keymaps()
       map("<S-Tab>", actions.prev_facet)
       map("<CR>", actions.jump)
       map("e", actions.explore_selection)
+      map("b", actions.explore_back)
+      map("f", actions.explore_forward)
       map("s", actions.open_split)
       map("v", actions.open_vsplit)
       map("t", actions.open_tab)
@@ -274,7 +307,7 @@ end
 local function create_session(opts)
   opts = opts or {}
   local target = target_context(opts)
-  local symbol = target.position
+  local symbol = target.explicit_position
       and symbol_util.detect_at(target.path, target.position.lnum, target.position.col)
     or symbol_util.detect()
   local session = {
@@ -290,6 +323,7 @@ local function create_session(opts)
     filetype = target.filetype,
     bufnr = target.bufnr,
     position = target.position,
+    history = history_state(opts.history),
     facet = symbol and "calls" or "all",
     auto_facet_pending = symbol ~= nil,
     filter = "",
@@ -452,32 +486,107 @@ function M.open()
   open_session()
 end
 
-function M.explore(item)
-  local current = state.current
-  if not current or not item or not item.path or item.path == "" then
-    vim.notify("Wayfinder: No explorable item selected", vim.log.levels.INFO)
-    return
+local function normalize_explore_item(item)
+  if not item or not item.path or item.path == "" then
+    return nil, "missing"
   end
   if item.source == "git" or item.kind == "commit" then
-    vim.notify("Wayfinder: Git rows are file history, not code locations", vim.log.levels.INFO)
-    return
+    return nil, "git"
   end
 
   local path = vim.fs.normalize(item.path)
   if not path or vim.uv.fs_stat(path) == nil then
-    vim.notify("Wayfinder: Selected item is no longer available", vim.log.levels.WARN)
+    return nil, "missing_path"
+  end
+
+  return vim.tbl_extend("force", item, { path = path })
+end
+
+local function explore_notice(prefix, item)
+  local symbol = item.lnum and item.col and symbol_util.detect_at(item.path, item.lnum, item.col)
+    or nil
+  local label = symbol and symbol.text or vim.fs.basename(item.path)
+  state.set_notice(prefix .. " " .. label, 1400)
+end
+
+local function open_context(context, history, origin_win)
+  open_session(nil, {
+    item = context.item,
+    origin_win = origin_win,
+    cwd = context.cwd,
+    from_bufnr = context.from_bufnr,
+    history = history,
+  })
+end
+
+function M.explore(item)
+  local current = state.current
+  if not current then
+    vim.notify("Wayfinder: No explorable item selected", vim.log.levels.INFO)
     return
   end
 
-  local symbol = item.lnum and item.col and symbol_util.detect_at(path, item.lnum, item.col) or nil
-  local label = symbol and symbol.text or vim.fs.basename(path)
-  state.set_notice("Exploring " .. label, 1400)
-  open_session(nil, {
-    item = vim.tbl_extend("force", item, { path = path }),
-    origin_win = current.origin_win,
+  local normalized, err = normalize_explore_item(item)
+  if not normalized then
+    if err == "git" then
+      vim.notify("Wayfinder: Git rows are file history, not code locations", vim.log.levels.INFO)
+    elseif err == "missing_path" then
+      vim.notify("Wayfinder: Selected item is no longer available", vim.log.levels.WARN)
+    else
+      vim.notify("Wayfinder: No explorable item selected", vim.log.levels.INFO)
+    end
+    return
+  end
+
+  local current_context = context_from_session(current)
+  local history = history_state(current.history)
+  if current_context then
+    history.back[#history.back + 1] = current_context
+  end
+  history.forward = {}
+
+  explore_notice("Exploring", normalized)
+  open_context({
+    item = normalized,
     cwd = current.cwd,
     from_bufnr = current.bufnr,
-  })
+  }, history, current.origin_win)
+end
+
+function M.explore_back()
+  local current = state.current
+  local history = current and history_state(current.history) or nil
+  if not current or not history or #history.back == 0 then
+    vim.notify("Wayfinder: No previous explore target", vim.log.levels.INFO)
+    return
+  end
+
+  local target = table.remove(history.back)
+  local current_context = context_from_session(current)
+  if current_context then
+    history.forward[#history.forward + 1] = current_context
+  end
+
+  explore_notice("Back to", target.item)
+  open_context(target, history, current.origin_win)
+end
+
+function M.explore_forward()
+  local current = state.current
+  local history = current and history_state(current.history) or nil
+  if not current or not history or #history.forward == 0 then
+    vim.notify("Wayfinder: No next explore target", vim.log.levels.INFO)
+    return
+  end
+
+  local target = table.remove(history.forward)
+  local current_context = context_from_session(current)
+  if current_context then
+    history.back[#history.back + 1] = current_context
+  end
+
+  explore_notice("Forward to", target.item)
+  open_context(target, history, current.origin_win)
 end
 
 function M.export_quickfix()

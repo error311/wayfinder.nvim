@@ -577,6 +577,16 @@ function M.render(session)
   end
   local count_label = string.format("%d results", #session.visible_items)
   local loading_label = session.loading and "loading…" or nil
+  local history_back = #(vim.tbl_get(session, "history", "back") or {})
+  local history_forward = #(vim.tbl_get(session, "history", "forward") or {})
+  local history_label = nil
+  if history_back > 0 and history_forward > 0 then
+    history_label = string.format("Back %d  Forward %d", history_back, history_forward)
+  elseif history_back > 0 then
+    history_label = string.format("Back %d", history_back)
+  elseif history_forward > 0 then
+    history_label = "Original"
+  end
   local filter_label = session.filter ~= "" and ("/" .. session.filter) or nil
   local selected_item = session.visible_items[session.selection_index]
   local reason_label = selected_item and selected_item.reason or nil
@@ -601,6 +611,10 @@ function M.render(session)
   if loading_label then
     table.insert(top_segments, { text = separator })
     table.insert(top_segments, { text = loading_label, group = "WayfinderDim", truncate = "end" })
+  end
+  if history_label then
+    table.insert(top_segments, { text = separator })
+    table.insert(top_segments, { text = history_label, group = "WayfinderDim", truncate = "end" })
   end
   if notice then
     table.insert(top_segments, { text = separator })
@@ -666,7 +680,7 @@ function M.render(session)
   sync_list_cursor(session)
 
   local bottom_lines = {
-    " <CR> jump  e explore  j/k move  h/l facets  <Tab>/<S-Tab> cycle  gg/G ends  <C-u>/<C-d> page ",
+    " <CR> jump  e explore  b/f history  j/k move  h/l facets  <Tab>/<S-Tab> cycle  gg/G ends  <C-u>/<C-d> page ",
     " p pin  P trail  S menu  [] saved  x qf  dd remove  da clear  D details  / filter  q close ",
   }
   local bottom_width = state.ui.bottom
@@ -685,7 +699,7 @@ function M.render(session)
     state.ui.bottom_buf,
     0,
     bottom_lines[1],
-    { "<CR>", "e", "j/k", "gg/G", "<C-u>/<C-d>", "h/l", "<Tab>", "<S-Tab>" },
+    { "<CR>", "e", "b/f", "j/k", "gg/G", "<C-u>/<C-d>", "h/l", "<Tab>", "<S-Tab>" },
     "WayfinderHeader",
     200
   )

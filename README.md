@@ -33,6 +33,7 @@ Pin useful stops into Trail while you explore, then save that Trail per project 
 - Syntax-highlighted preview
 - Preview header with project-relative file context and line range
 - Explore from a selected code result without leaving the picker
+- Back/forward navigation through in-session explore history
 - Trail facet for pinned breadcrumbs
 - Persistent named Trails per project
 - Explicit resume for the last active saved Trail
@@ -73,8 +74,9 @@ If there is no symbol under the cursor, it falls back to the current file.
 2. Move across `Calls`, `Refs`, `Tests`, `Git`, and `Trail`.
 3. Use preview to confirm the right match before jumping.
 4. Press `e` on a code result to explore outward from that symbol/location.
-5. Pin useful stops into Trail while exploring.
-6. Save, reload, or resume a Trail later if you want to keep that exploration path.
+5. Use `b` / `f` to move backward and forward through explored targets.
+6. Pin useful stops into Trail while exploring.
+7. Save, reload, or resume a Trail later if you want to keep that exploration path.
 
 ## Optional Setup
 
@@ -186,6 +188,7 @@ Mappings:
 - `<S-Tab>` previous facet
 - `<CR>` jump
 - `e` explore selected code result
+- `b` / `f` back / forward through explore history
 - `s` open in split
 - `v` open in vsplit
 - `t` open in tab

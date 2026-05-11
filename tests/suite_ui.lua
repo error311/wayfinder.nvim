@@ -473,3 +473,70 @@ test("explore ignores git history rows because they are not code locations", fun
   assert_ok(state.current.subject == "createUser", "git row explore should leave session unchanged")
   state.current = nil
 end)
+
+test("explore history moves back and forward without changing Trail", function()
+  -- Guards the reversible explore loop while keeping it separate from pinned Trail state.
+  local bufnr = open_typescript(fixture_root .. "/src/user_service.ts")
+  t.start_demo_lsp(bufnr, fixture_root)
+  vim.api.nvim_win_set_cursor(0, { 1, 18 })
+  trail.clear()
+  assert_ok(
+    trail.pin({
+      id = "trail-create-user",
+      label = "createUser",
+      path = fixture_root .. "/src/user_service.ts",
+      lnum = 1,
+      col = 17,
+      source = "lsp",
+    }),
+    "pin initial trail item"
+  )
+
+  wayfinder.open()
+  assert_ok(state.current.subject == "createUser", "expected initial subject")
+
+  wayfinder.explore({
+    id = "target-find-user",
+    label = "export function findUser(id: string) {",
+    path = fixture_root .. "/src/user_service.ts",
+    lnum = 8,
+    col = 18,
+    source = "lsp",
+  })
+  assert_ok(state.current.subject == "findUser", "expected first explore target")
+  assert_ok(#state.current.history.back == 1, "expected one explore back entry")
+  assert_ok(#state.current.history.forward == 0, "expected empty explore forward stack")
+
+  wayfinder.explore({
+    id = "target-update-user",
+    label = "export function updateUser(id: string, name: string) {",
+    path = fixture_root .. "/src/user_service.ts",
+    lnum = 15,
+    col = 18,
+    source = "lsp",
+  })
+  assert_ok(state.current.subject == "updateUser", "expected second explore target")
+  assert_ok(#state.current.history.back == 2, "expected two explore back entries")
+
+  wayfinder.explore_back()
+  assert_ok(state.current.subject == "findUser", "expected back to previous target")
+  assert_ok(#state.current.history.back == 1, "expected one remaining back entry")
+  assert_ok(#state.current.history.forward == 1, "expected one forward entry")
+
+  wayfinder.explore_back()
+  assert_ok(state.current.subject == "createUser", "expected back to initial target")
+  assert_ok(#state.current.history.back == 0, "expected no remaining back entries")
+  assert_ok(#state.current.history.forward == 2, "expected two forward entries")
+
+  wayfinder.explore_forward()
+  assert_ok(state.current.subject == "findUser", "expected forward to next target")
+  assert_ok(#state.current.history.back == 1, "expected back entry after forward")
+  assert_ok(#state.current.history.forward == 1, "expected one remaining forward entry")
+  assert_ok(#trail.items() == 1, "explore history should not mutate Trail")
+
+  layout.close()
+  if state.current and state.current.cancel then
+    state.current:cancel()
+  end
+  state.current = nil
+end)

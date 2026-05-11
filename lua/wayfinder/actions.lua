@@ -474,6 +474,14 @@ function M.explore_selection()
   require("wayfinder").explore(selection_item())
 end
 
+function M.explore_back()
+  require("wayfinder").explore_back()
+end
+
+function M.explore_forward()
+  require("wayfinder").explore_forward()
+end
+
 function M.pin()
   local item = selection_item()
   if item and trail.pin(item) then

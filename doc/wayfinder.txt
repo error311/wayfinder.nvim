@@ -37,7 +37,8 @@ It gathers:
 
 The Trail facet lets you pin items while exploring.
 Use `e` on a code result to explore from that symbol/location without leaving
-the picker.
+the picker. Use `b` and `f` to move backward and forward through explored
+targets.
 If no symbol is detected under the cursor, it falls back to the current file.
 
 ==============================================================================
@@ -137,6 +138,7 @@ Example mappings:
   <S-Tab>    Previous facet
   <CR>       Jump
   e          Explore from selected code result
+  b / f      Back / forward through explore history
   s          Open in split
   v          Open in vsplit
   t          Open in tab
