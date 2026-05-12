@@ -1,5 +1,17 @@
 # Changelog
 
+## v0.2.6 - 2026-05-12
+
+Explore targets can now be kept explicitly in Trail.
+
+- Added `a` inside Wayfinder to pin the current explored target into Trail.
+- Added `A` inside Wayfinder to pin the current explore path into Trail.
+- Trail now groups `a` / `A` target pins separately from `p` row pins.
+- Target/path pinning is explicit and dedupes existing Trail locations; exploring still does not auto-pin.
+- Explore history remains temporary, while Trail remains the durable breadcrumb path.
+
+---
+
 ## v0.2.5 - 2026-05-11
 
 Explore pivots are now reversible inside the picker.

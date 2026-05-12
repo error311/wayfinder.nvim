@@ -34,6 +34,7 @@ Pin useful stops into Trail while you explore, then save that Trail per project 
 - Preview header with project-relative file context and line range
 - Explore from a selected code result without leaving the picker
 - Back/forward navigation through in-session explore history
+- Explicitly add the current target or explore path to Trail
 - Trail facet for pinned breadcrumbs
 - Persistent named Trails per project
 - Explicit resume for the last active saved Trail
@@ -75,8 +76,9 @@ If there is no symbol under the cursor, it falls back to the current file.
 3. Use preview to confirm the right match before jumping.
 4. Press `e` on a code result to explore outward from that symbol/location.
 5. Use `b` / `f` to move backward and forward through explored targets.
-6. Pin useful stops into Trail while exploring.
-7. Save, reload, or resume a Trail later if you want to keep that exploration path.
+6. Use `a` to add the current target to Trail, or `A` to add the current explore path.
+7. Pin useful rows into Trail with `p` while exploring.
+8. Save, reload, or resume a Trail later if you want to keep that exploration path.
 
 ## Optional Setup
 
@@ -189,6 +191,8 @@ Mappings:
 - `<CR>` jump
 - `e` explore selected code result
 - `b` / `f` back / forward through explore history
+- `a` add current target to Trail
+- `A` add current explore path to Trail
 - `s` open in split
 - `v` open in vsplit
 - `t` open in tab
@@ -213,7 +217,10 @@ Trail is the working breadcrumb list you build while exploring.
 
 Core Trail actions:
 
-- `p` pins the current item
+- `p` pins the selected row
+- `a` pins the current Wayfinder target
+- `A` pins the current explore path
+- Trail groups explore targets separately from selected row pins
 - `P` opens the Trail facet
 - `S` opens the Trail menu for save/resume/load/rename/delete actions
 - `[` / `]` cycle through saved Trails for the current project

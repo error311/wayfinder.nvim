@@ -176,17 +176,40 @@ local function filtered_items(session)
   end
 
   if session.facet == "trail" then
-    all_items = trail.items()
+    local target_items = {}
+    local row_items = {}
+    for _, item in ipairs(trail.items()) do
+      if item.kind == "target" and item.source == "wayfinder" then
+        target_items[#target_items + 1] = item
+      else
+        row_items[#row_items + 1] = item
+      end
+    end
+
+    all_items = {}
+    vim.list_extend(all_items, target_items)
+    vim.list_extend(all_items, row_items)
+
     for index, item in ipairs(all_items) do
-      local previous = all_items[index - 1]
+      local group_items = item.kind == "target" and item.source == "wayfinder" and target_items
+        or row_items
+      local group_index = 1
+      for candidate_index, candidate in ipairs(group_items) do
+        if candidate.id == item.id then
+          group_index = candidate_index
+          break
+        end
+      end
+      local previous = group_items[group_index - 1]
       local destination =
         string.format("%s:%d", paths.display(item.path, session.project_root), item.lnum or 1)
 
-      item.icon = index == 1 and config.values.icons.trail or "↳"
-      item.group = "Pinned Trail"
+      item.icon = group_index == 1 and config.values.icons.trail or "↳"
+      item.group = item.kind == "target" and item.source == "wayfinder" and "Explore Targets"
+        or "Pinned Rows"
       item.secondary = previous
-          and string.format("%02d  %s → %s", index, previous.label, destination)
-        or string.format("%02d  %s", index, destination)
+          and string.format("%02d  %s → %s", group_index, previous.label, destination)
+        or string.format("%02d  %s", group_index, destination)
     end
   end
 
@@ -284,6 +307,8 @@ local function keymaps()
       map("v", actions.open_vsplit)
       map("t", actions.open_tab)
       map("p", actions.pin)
+      map("a", actions.pin_current_target)
+      map("A", actions.pin_explore_path)
       map("P", actions.open_trail)
       map("S", actions.trail_menu)
       map("[", actions.prev_saved_trail)

@@ -88,8 +88,11 @@ local function header_group(group)
   if group == "Recent Commits" then
     return "WayfinderDim"
   end
-  if group == "Pinned Trail" then
+  if group == "Pinned Trail" or group == "Explore Targets" then
     return "WayfinderTrail"
+  end
+  if group == "Pinned Rows" then
+    return "WayfinderHeader"
   end
   return "WayfinderHeader"
 end

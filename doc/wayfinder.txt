@@ -38,7 +38,8 @@ It gathers:
 The Trail facet lets you pin items while exploring.
 Use `e` on a code result to explore from that symbol/location without leaving
 the picker. Use `b` and `f` to move backward and forward through explored
-targets.
+targets. Use `a` to add the current target to Trail, or `A` to add the current
+explore path.
 If no symbol is detected under the cursor, it falls back to the current file.
 
 ==============================================================================
@@ -139,10 +140,12 @@ Example mappings:
   <CR>       Jump
   e          Explore from selected code result
   b / f      Back / forward through explore history
+  a          Add current target to Trail
+  A          Add current explore path to Trail
   s          Open in split
   v          Open in vsplit
   t          Open in tab
-  p          Pin current item into Trail
+  p          Pin selected row into Trail
   P          Open Trail
   S          Open Trail menu
   [          Previous saved Trail
@@ -216,7 +219,15 @@ Persistent named Trails are explicit:
 Inside Wayfinder:
 
   p
-      Pin the current item.
+      Pin the selected row.
+
+  a
+      Add the current Wayfinder target to Trail.
+
+  A
+      Add the current explore path to Trail.
+
+  Trail groups explore targets separately from selected row pins.
 
   P
       Open the current working Trail.

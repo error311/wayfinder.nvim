@@ -5,6 +5,7 @@ local trail = require("wayfinder.trail")
 local trail_persistence = require("wayfinder.trail_persistence")
 local open = require("wayfinder.util.open")
 local facets = require("wayfinder.render.facets")
+local paths = require("wayfinder.util.paths")
 
 local M = {}
 
@@ -69,6 +70,110 @@ end
 local function selection_item()
   local session = current()
   return session and session.visible_items[session.selection_index] or nil
+end
+
+local function target_context(session)
+  if not session or not session.path or session.path == "" then
+    return nil
+  end
+
+  return {
+    item = {
+      path = session.path,
+      lnum = session.position and session.position.lnum or 1,
+      col = session.position and session.position.col or 1,
+    },
+    label = session.subject or paths.basename(session.path),
+  }
+end
+
+local function target_item_from_context(session, context, index)
+  if not session or not context or not context.item or not context.item.path then
+    return nil
+  end
+
+  local path = vim.fs.normalize(context.item.path)
+  if not path or vim.uv.fs_stat(path) == nil then
+    return nil
+  end
+
+  local lnum = context.item.lnum or 1
+  local col = context.item.col or 1
+  local root = session.project_root or session.cwd
+  local location = paths.display(path, root)
+  local label = context.label or paths.basename(path)
+
+  return {
+    id = table.concat({ "target", path, lnum, col }, "::"),
+    facet = "trail",
+    kind = "target",
+    source = "wayfinder",
+    badge = "TARGET",
+    label = label,
+    path = path,
+    lnum = lnum,
+    col = col,
+    preview_range = { start = lnum, ["end"] = lnum + 2 },
+    detail = location,
+    secondary = index and string.format("%02d  %s", index, location) or location,
+    reason = "explore target",
+  }
+end
+
+local function trail_has_location(item)
+  if not item then
+    return true
+  end
+
+  for _, pinned in ipairs(trail.items()) do
+    if pinned.id == item.id then
+      return true
+    end
+    if
+      pinned.path == item.path
+      and (pinned.lnum or 1) == (item.lnum or 1)
+      and (pinned.col or 1) == (item.col or 1)
+    then
+      return true
+    end
+  end
+
+  return false
+end
+
+local function pin_target_item(item)
+  if not item or trail_has_location(item) then
+    return false
+  end
+
+  return trail.pin(item)
+end
+
+local function set_pin_notice(label, added)
+  local trail_count = #trail.items()
+  if added and added > 0 then
+    state.set_notice(
+      string.format(
+        "Pinned %s • %d added • %d item%s",
+        label,
+        added,
+        trail_count,
+        trail_count == 1 and "" or "s"
+      ),
+      1800
+    )
+    return
+  end
+
+  state.set_notice(
+    string.format(
+      "%s already in Trail • %d item%s",
+      label,
+      trail_count,
+      trail_count == 1 and "" or "s"
+    ),
+    1800
+  )
 end
 
 local function export_notice(session, message)
@@ -492,6 +597,48 @@ function M.pin()
     )
     rerender()
   end
+end
+
+function M.pin_current_target()
+  local session = current()
+  local item = target_item_from_context(session, target_context(session))
+  if not item then
+    export_notice(session, "Wayfinder: No current target to pin")
+    return
+  end
+
+  local added = pin_target_item(item) and 1 or 0
+  set_pin_notice("current target", added)
+  rerender()
+end
+
+function M.pin_explore_path()
+  local session = current()
+  if not session then
+    return
+  end
+
+  local contexts = vim.deepcopy(vim.tbl_get(session, "history", "back") or {})
+  local current_context = target_context(session)
+  if current_context then
+    contexts[#contexts + 1] = current_context
+  end
+
+  if #contexts == 0 then
+    export_notice(session, "Wayfinder: No explore path to pin")
+    return
+  end
+
+  local added = 0
+  for index, context in ipairs(contexts) do
+    local item = target_item_from_context(session, context, index)
+    if item and pin_target_item(item) then
+      added = added + 1
+    end
+  end
+
+  set_pin_notice("explore path", added)
+  rerender()
 end
 
 function M.remove_trail_item()

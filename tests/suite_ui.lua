@@ -540,3 +540,79 @@ test("explore history moves back and forward without changing Trail", function()
   end
   state.current = nil
 end)
+
+test("current target and explore path pin explicitly into Trail", function()
+  -- Guards target/path pinning so explore history can be kept deliberately without auto-pinning.
+  local bufnr = open_typescript(fixture_root .. "/src/user_service.ts")
+  t.start_demo_lsp(bufnr, fixture_root)
+  vim.api.nvim_win_set_cursor(0, { 1, 18 })
+  trail.clear()
+
+  wayfinder.open()
+  actions.pin_current_target()
+  assert_ok(#trail.items() == 1, "expected current target to pin")
+  assert_ok(trail.items()[1].label == "createUser", "expected pinned current target label")
+  assert_ok(trail.items()[1].source == "wayfinder", "expected current target source")
+  assert_ok(
+    trail.pin({
+      id = "row-user-service",
+      label = "row pin",
+      path = fixture_root .. "/src/user_service.ts",
+      lnum = 21,
+      col = 25,
+      source = "lsp",
+      facet = "refs",
+    }),
+    "pin selected-row style item"
+  )
+
+  state.current.facet = "trail"
+  state.current.selection_id = nil
+  state.current.selection_index = 1
+  state.current:refresh_visible()
+  assert_ok(
+    state.current.visible_items[1].group == "Explore Targets",
+    "expected target pins to render in their own group"
+  )
+  assert_ok(
+    state.current.visible_items[2].group == "Pinned Rows",
+    "expected row pins to render separately from target pins"
+  )
+
+  actions.pin_current_target()
+  assert_ok(#trail.items() == 2, "pinning current target twice should not duplicate")
+
+  trail.clear()
+  wayfinder.explore({
+    id = "target-find-user",
+    label = "export function findUser(id: string) {",
+    path = fixture_root .. "/src/user_service.ts",
+    lnum = 8,
+    col = 18,
+    source = "lsp",
+  })
+  wayfinder.explore({
+    id = "target-update-user",
+    label = "export function updateUser(id: string, name: string) {",
+    path = fixture_root .. "/src/user_service.ts",
+    lnum = 15,
+    col = 18,
+    source = "lsp",
+  })
+
+  actions.pin_explore_path()
+  local pinned = trail.items()
+  assert_ok(#pinned == 3, "expected explore path to pin original and explored targets")
+  assert_ok(pinned[1].label == "createUser", "expected original target first")
+  assert_ok(pinned[2].label == "findUser", "expected first explored target second")
+  assert_ok(pinned[3].label == "updateUser", "expected current explored target third")
+
+  actions.pin_explore_path()
+  assert_ok(#trail.items() == 3, "pinning explore path twice should not duplicate")
+
+  layout.close()
+  if state.current and state.current.cancel then
+    state.current:cancel()
+  end
+  state.current = nil
+end)
