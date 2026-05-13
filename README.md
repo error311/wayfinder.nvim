@@ -35,6 +35,7 @@ Pin useful stops into Trail while you explore, then save that Trail per project 
 - Explore from a selected code result without leaving the picker
 - Back/forward navigation through in-session explore history
 - Explicitly add the current target or explore path to Trail
+- Toggleable bottom keyhint bar that gives rows back to the panes
 - Trail facet for pinned breadcrumbs
 - Persistent named Trails per project
 - Explicit resume for the last active saved Trail
@@ -89,6 +90,7 @@ require("wayfinder").setup({
   layout = {
     width = 0.88,
     height = 0.72,
+    show_hints = true,
   },
 })
 ```
@@ -207,6 +209,7 @@ Mappings:
 - `/` filter
 - `<C-l>` clear filter
 - `D` toggle details
+- `?` toggle bottom key hints
 - `r` refresh
 - `q` close
 - mouse wheel scrolls results

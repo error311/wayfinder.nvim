@@ -10,11 +10,29 @@ local text_util = require("wayfinder.util.text")
 
 local M = {}
 
-local core_windows = { "border", "top", "facet", "list", "preview", "bottom" }
-local core_buffers = { "top_buf", "facet_buf", "list_buf", "preview_buf", "bottom_buf" }
 local close_group = vim.api.nvim_create_augroup("WayfinderClose", { clear = true })
 local closing = false
 local highlight_ns = vim.api.nvim_create_namespace("wayfinder.layout")
+
+local function hints_visible()
+  return config.values.layout.show_hints ~= false
+end
+
+local function core_windows()
+  local keys = { "border", "top", "facet", "list", "preview" }
+  if hints_visible() then
+    keys[#keys + 1] = "bottom"
+  end
+  return keys
+end
+
+local function core_buffers()
+  local keys = { "top_buf", "facet_buf", "list_buf", "preview_buf" }
+  if hints_visible() then
+    keys[#keys + 1] = "bottom_buf"
+  end
+  return keys
+end
 
 local function interactive_windows()
   return {
@@ -188,13 +206,13 @@ local function clear_ui()
 end
 
 local function ui_valid()
-  for _, key in ipairs(core_windows) do
+  for _, key in ipairs(core_windows()) do
     if not state.ui[key] or not vim.api.nvim_win_is_valid(state.ui[key]) then
       return false
     end
   end
 
-  for _, key in ipairs(core_buffers) do
+  for _, key in ipairs(core_buffers()) do
     if not state.ui[key] or not vim.api.nvim_buf_is_valid(state.ui[key]) then
       return false
     end
@@ -242,13 +260,14 @@ local function resolve_dimensions()
   local width = math.floor(vim.o.columns * config.values.layout.width)
   local height = math.floor(vim.o.lines * config.values.layout.height)
   local header_height = 1
-  local footer_height = 2
+  local footer_height = hints_visible() and 2 or 0
+  local bottom_padding = footer_height > 0 and 2 or 0
   local min_facet_width = 12
   local min_list_width = 24
   local min_preview_width = 18
   local min_body_height = 4
   local min_columns = min_facet_width + min_list_width + min_preview_width + 6
-  local min_lines = header_height + footer_height + min_body_height + 2
+  local min_lines = header_height + footer_height + bottom_padding + min_body_height
   local required_columns = math.ceil(min_columns / config.values.layout.width)
   local required_lines = math.ceil(min_lines / config.values.layout.height)
 
@@ -262,7 +281,7 @@ local function resolve_dimensions()
     math.max(min_list_width, math.floor(available_width * 0.38))
   )
   local preview_width = available_width - facet_width - list_width
-  local body_height = height - header_height - footer_height - 2
+  local body_height = height - header_height - footer_height - bottom_padding
 
   if preview_width < min_preview_width then
     local shortage = min_preview_width - preview_width
@@ -448,26 +467,33 @@ function M.open()
   })
   vim.wo[state.ui.list_divider].winhighlight = "Normal:WayfinderDim"
 
-  local bottom_buf = create_buf("wayfinder://bottom")
-  state.ui.bottom_buf = bottom_buf
-  state.ui.bottom = create_window(bottom_buf, {
-    relative = "editor",
-    row = row + height - 2,
-    col = col + 1,
-    width = width - 2,
-    height = footer_height,
-    style = "minimal",
-  }, {
-    focusable = false,
-    mouse = false,
-    zindex = 60,
-  })
+  if footer_height > 0 then
+    local bottom_buf = create_buf("wayfinder://bottom")
+    state.ui.bottom_buf = bottom_buf
+    state.ui.bottom = create_window(bottom_buf, {
+      relative = "editor",
+      row = row + height - 2,
+      col = col + 1,
+      width = width - 2,
+      height = footer_height,
+      style = "minimal",
+    }, {
+      focusable = false,
+      mouse = false,
+      zindex = 60,
+    })
+  end
 
   if state.ui.list and vim.api.nvim_win_is_valid(state.ui.list) then
     vim.api.nvim_set_current_win(state.ui.list)
   end
 
   return true
+end
+
+function M.toggle_hints()
+  config.values.layout.show_hints = not hints_visible()
+  clear_ui()
 end
 
 function M.focus_primary()
@@ -679,38 +705,40 @@ function M.render(session)
   sync_facet_cursor(session)
   sync_list_cursor(session)
 
-  local bottom_lines = {
-    " <CR> jump  e explore  b/f history  j/k move  h/l facets  <Tab>/<S-Tab> cycle  gg/G ends  <C-u>/<C-d> page ",
-    " p pin row  a/A add target/path  P trail  S menu  [] saved  x qf  dd remove  da clear  D details  / filter  q close ",
-  }
-  local bottom_width = state.ui.bottom
-      and vim.api.nvim_win_is_valid(state.ui.bottom)
-      and vim.api.nvim_win_get_width(state.ui.bottom)
-    or top_width
-  bottom_lines = vim.tbl_map(function(line)
-    return fit_line(line, bottom_width)
-  end, bottom_lines)
-  set_lines(state.ui.bottom_buf, bottom_lines)
-  vim.api.nvim_buf_clear_namespace(state.ui.bottom_buf, highlight_ns, 0, -1)
-  for line = 0, #bottom_lines - 1 do
-    set_range_highlight(state.ui.bottom_buf, line, 1, -1, "WayfinderDim", 100)
+  if hints_visible() and state.ui.bottom_buf and vim.api.nvim_buf_is_valid(state.ui.bottom_buf) then
+    local bottom_lines = {
+      " <CR> jump  e explore  b/f history  j/k move  h/l facets  <Tab>/<S-Tab> cycle  gg/G ends  <C-u>/<C-d> page ",
+      " p pin row  a/A add target/path  P trail  S menu  [] saved  ? hints  x qf  dd remove  da clear  D details  / filter  q close ",
+    }
+    local bottom_width = state.ui.bottom
+        and vim.api.nvim_win_is_valid(state.ui.bottom)
+        and vim.api.nvim_win_get_width(state.ui.bottom)
+      or top_width
+    bottom_lines = vim.tbl_map(function(line)
+      return fit_line(line, bottom_width)
+    end, bottom_lines)
+    set_lines(state.ui.bottom_buf, bottom_lines)
+    vim.api.nvim_buf_clear_namespace(state.ui.bottom_buf, highlight_ns, 0, -1)
+    for line = 0, #bottom_lines - 1 do
+      set_range_highlight(state.ui.bottom_buf, line, 1, -1, "WayfinderDim", 100)
+    end
+    add_substring_highlights(
+      state.ui.bottom_buf,
+      0,
+      bottom_lines[1],
+      { "<CR>", "e", "b/f", "j/k", "gg/G", "<C-u>/<C-d>", "h/l", "<Tab>", "<S-Tab>" },
+      "WayfinderHeader",
+      200
+    )
+    add_substring_highlights(
+      state.ui.bottom_buf,
+      1,
+      bottom_lines[2],
+      { "p", "a/A", "P", "S", "[", "]", "?", "x", "dd", "da", "D", "/", "q" },
+      "WayfinderHeader",
+      200
+    )
   end
-  add_substring_highlights(
-    state.ui.bottom_buf,
-    0,
-    bottom_lines[1],
-    { "<CR>", "e", "b/f", "j/k", "gg/G", "<C-u>/<C-d>", "h/l", "<Tab>", "<S-Tab>" },
-    "WayfinderHeader",
-    200
-  )
-  add_substring_highlights(
-    state.ui.bottom_buf,
-    1,
-    bottom_lines[2],
-    { "p", "a/A", "P", "S", "[", "]", "x", "dd", "da", "D", "/", "q" },
-    "WayfinderHeader",
-    200
-  )
 
   preview_debounced(session)
   return true

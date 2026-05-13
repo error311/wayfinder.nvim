@@ -41,6 +41,7 @@ the picker. Use `b` and `f` to move backward and forward through explored
 targets. Use `a` to add the current target to Trail, or `A` to add the current
 explore path.
 If no symbol is detected under the cursor, it falls back to the current file.
+Use `?` to hide or show the bottom keyhint bar.
 
 ==============================================================================
 2. Command                                             *wayfinder-command*
@@ -156,6 +157,7 @@ Example mappings:
   /          Set local filter
   <C-l>      Clear local filter
   D          Toggle optional details
+  ?          Toggle bottom key hints
   r          Refresh
   q          Close
 
@@ -260,6 +262,7 @@ If Trail is empty, Wayfinder shows:
     layout = {
       width = 0.88,
       height = 0.72,
+      show_hints = true,
     },
   })
 <

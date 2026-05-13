@@ -58,6 +58,7 @@ local defaults = {
     title = " Wayfinder ",
     facet_width = 16,
     list_width = 39,
+    show_hints = true,
   },
 }
 

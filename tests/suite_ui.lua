@@ -12,6 +12,7 @@ local fixture_root = t.fixture_root
 local open_typescript = t.open_typescript
 local preview = require("wayfinder.render.preview")
 local async = require("wayfinder.util.async")
+local config = require("wayfinder.config")
 
 test("quickfix export preserves visible order and trail order", function()
   -- Guards quickfix export ordering for both the active facet and Trail.
@@ -303,6 +304,45 @@ test("top bar fits available width with long status segments", function()
   trail_persistence.saved_count = saved_count
   state.reset_trail_persistence()
   state.current = nil
+end)
+
+test("hint bar toggle gives pane rows back and remembers runtime preference", function()
+  -- Guards the learned-user path so key hints can get out of the way without wasting layout space.
+  local saved_show_hints = config.values.layout.show_hints
+  config.values.layout.show_hints = true
+
+  open_typescript(fixture_root .. "/src/user_service.ts")
+  vim.api.nvim_win_set_cursor(0, { 1, 18 })
+  wayfinder.open()
+
+  local with_hints = vim.api.nvim_win_get_height(state.ui.list)
+  assert_ok(state.ui.bottom and vim.api.nvim_win_is_valid(state.ui.bottom), "expected hint bar")
+
+  actions.toggle_hints()
+  local without_hints = vim.api.nvim_win_get_height(state.ui.list)
+  local border_cfg = vim.api.nvim_win_get_config(state.ui.border)
+  local list_cfg = vim.api.nvim_win_get_config(state.ui.list)
+  assert_ok(config.values.layout.show_hints == false, "expected hidden hint preference")
+  assert_ok(state.ui.bottom == nil, "expected hint bar to close")
+  assert_ok(without_hints > with_hints, "expected hidden hints to add pane height")
+  assert_ok(
+    border_cfg.row + border_cfg.height + 1 == list_cfg.row + list_cfg.height,
+    "expected hidden hint panes to reach the bottom of the frame"
+  )
+
+  actions.toggle_hints()
+  assert_ok(config.values.layout.show_hints == true, "expected shown hint preference")
+  assert_ok(
+    state.ui.bottom and vim.api.nvim_win_is_valid(state.ui.bottom),
+    "expected hint bar back"
+  )
+
+  layout.close()
+  if state.current and state.current.cancel then
+    state.current:cancel()
+  end
+  state.current = nil
+  config.values.layout.show_hints = saved_show_hints
 end)
 
 test("git preview ignores stale async callbacks after selection changes", function()

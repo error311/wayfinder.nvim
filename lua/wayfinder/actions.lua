@@ -1030,6 +1030,11 @@ function M.toggle_details()
   end
 end
 
+function M.toggle_hints()
+  layout.toggle_hints()
+  require("wayfinder").resume_session_ui()
+end
+
 function M.close()
   local session = current()
   local target_win = session and session.origin_win or nil

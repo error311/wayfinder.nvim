@@ -1,5 +1,15 @@
 # Changelog
 
+## v0.2.7 - 2026-05-13
+
+The bottom keyhint bar can now get out of the way after the commands are familiar.
+
+- Added `?` to hide or show the bottom keyhint bar.
+- Hiding the keyhint bar lets the Wayfinder panes expand to the bottom of the frame.
+- The visibility preference persists for the current Neovim session, and can be set with `layout.show_hints`.
+
+---
+
 ## v0.2.6 - 2026-05-12
 
 Explore targets can now be kept explicitly in Trail.
