@@ -9,6 +9,7 @@ local items = require("wayfinder.util.items")
 local paths = require("wayfinder.util.paths")
 local scope = require("wayfinder.util.scope")
 local filter = require("wayfinder.util.filter")
+local explore_target = require("wayfinder.util.explore_target")
 local sources = {
   lsp = require("wayfinder.sources.lsp"),
   tests = require("wayfinder.sources.tests"),
@@ -512,27 +513,29 @@ function M.open()
   open_session()
 end
 
-local function normalize_explore_item(item)
-  if not item or not item.path or item.path == "" then
-    return nil, "missing"
-  end
-  if item.source == "git" or item.kind == "commit" then
-    return nil, "git"
-  end
-
-  local path = vim.fs.normalize(item.path)
-  if not path or vim.uv.fs_stat(path) == nil then
-    return nil, "missing_path"
-  end
-
-  return vim.tbl_extend("force", item, { path = path })
+local function selected_explore_target(item, session)
+  return explore_target.resolve(item, {
+    project_root = session and (session.project_root or session.cwd) or nil,
+  })
 end
 
-local function explore_notice(prefix, item)
-  local symbol = item.lnum and item.col and symbol_util.detect_at(item.path, item.lnum, item.col)
-    or nil
-  local label = symbol and symbol.text or vim.fs.basename(item.path)
-  state.set_notice(prefix .. " " .. label, 1400)
+local function show_explore_error(session, target)
+  local message = "Wayfinder: " .. (target and target.reason or "No explorable item selected")
+  if session and layout.is_open() then
+    state.set_notice(message:gsub("^Wayfinder:%s*", ""), 1800)
+    layout.render(session)
+    keymaps()
+    layout.focus_primary()
+    return
+  end
+
+  local level = target and target.label == "Missing file" and vim.log.levels.WARN
+    or vim.log.levels.INFO
+  vim.notify(message, level)
+end
+
+local function explore_notice(prefix, target)
+  state.set_notice(prefix .. " " .. target.label, 1400)
 end
 
 local function open_context(context, history, origin_win)
@@ -552,15 +555,9 @@ function M.explore(item)
     return
   end
 
-  local normalized, err = normalize_explore_item(item)
-  if not normalized then
-    if err == "git" then
-      vim.notify("Wayfinder: Git rows are file history, not code locations", vim.log.levels.INFO)
-    elseif err == "missing_path" then
-      vim.notify("Wayfinder: Selected item is no longer available", vim.log.levels.WARN)
-    else
-      vim.notify("Wayfinder: No explorable item selected", vim.log.levels.INFO)
-    end
+  local target = selected_explore_target(item, current)
+  if not target.explorable then
+    show_explore_error(current, target)
     return
   end
 
@@ -571,9 +568,9 @@ function M.explore(item)
   end
   history.forward = {}
 
-  explore_notice("Exploring", normalized)
+  explore_notice("Exploring", target)
   open_context({
-    item = normalized,
+    item = target.item,
     cwd = current.cwd,
     from_bufnr = current.bufnr,
   }, history, current.origin_win)
@@ -593,7 +590,7 @@ function M.explore_back()
     history.forward[#history.forward + 1] = current_context
   end
 
-  explore_notice("Back to", target.item)
+  explore_notice("Back to", selected_explore_target(target.item, current))
   open_context(target, history, current.origin_win)
 end
 
@@ -611,7 +608,7 @@ function M.explore_forward()
     history.back[#history.back + 1] = current_context
   end
 
-  explore_notice("Forward to", target.item)
+  explore_notice("Forward to", selected_explore_target(target.item, current))
   open_context(target, history, current.origin_win)
 end
 

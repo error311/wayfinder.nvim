@@ -1,6 +1,7 @@
 local items = require("wayfinder.util.items")
 local text = require("wayfinder.util.text")
 local config = require("wayfinder.config")
+local explore_target = require("wayfinder.util.explore_target")
 
 local M = {}
 
@@ -177,6 +178,11 @@ function M.rows(session)
       if not already_shown then
         secondary_parts[#secondary_parts + 1] = item.detail
       end
+    end
+    if selected and session.show_details then
+      secondary_parts[#secondary_parts + 1] = explore_target.resolve(item, {
+        project_root = session.project_root or session.cwd,
+      }).detail_label
     end
     local secondary = table.concat(secondary_parts, "  •  ")
     if secondary == "" then

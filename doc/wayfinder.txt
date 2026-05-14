@@ -37,9 +37,11 @@ It gathers:
 
 The Trail facet lets you pin items while exploring.
 Use `e` on a code result to explore from that symbol/location without leaving
-the picker. Use `b` and `f` to move backward and forward through explored
-targets. Use `a` to add the current target to Trail, or `A` to add the current
-explore path.
+the picker. The top bar shows what `e` will explore for the selected row, and
+`D` details include the exact target location when there is room. Use `b` and
+`f` to move backward and forward through explored targets. Use `a` to add the
+current target to Trail, or `A` to add the current explore path.
+Git rows are history rows and explain why they cannot be explored.
 If no symbol is detected under the cursor, it falls back to the current file.
 Use `?` to hide or show the bottom keyhint bar.
 
@@ -139,7 +141,7 @@ Example mappings:
   <Tab>      Next facet
   <S-Tab>    Previous facet
   <CR>       Jump
-  e          Explore from selected code result
+  e          Explore from selected code result; top bar shows the target first
   b / f      Back / forward through explore history
   a          Add current target to Trail
   A          Add current explore path to Trail

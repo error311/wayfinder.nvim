@@ -1,11 +1,11 @@
 # wayfinder.nvim
 
-`wayfinder.nvim` is a guided code exploration tool for the current symbol.
+`wayfinder.nvim` is a guided code exploration picker for the current symbol or file.
 
-Wayfinder is not a general search tool. It does not try to replace Telescope or grep.
+It is not a general search tool, and it does not try to replace Telescope or grep.
 It replaces the manual loop of jump, grep, back, open, back, and "where was that test again?"
 
-From the current symbol or file, Wayfinder gathers the most relevant nearby code:
+Wayfinder opens a centered 3-pane picker and gathers connected code:
 
 - definitions
 - references
@@ -13,9 +13,7 @@ From the current symbol or file, Wayfinder gathers the most relevant nearby code
 - likely tests
 - recent commits
 
-It opens as a centered 3-pane picker, loads sources progressively, and keeps the screen focused on facets, rows, badges, previews, and a Trail you can actually keep.
-
-Pin useful stops into Trail while you explore, then save that Trail per project and resume the same path later.
+Pin useful stops into Trail while you explore, then save that Trail per project and resume it later.
 
 ![wayfinder motion](docs/media/wayfinder.gif)
 
@@ -28,24 +26,22 @@ Pin useful stops into Trail while you explore, then save that Trail per project 
 ## Features
 
 - Centered 3-pane floating layout
-- Facet rail with counts
-- Dense result list with badges and grouped headers
-- Syntax-highlighted preview
-- Preview header with project-relative file context and line range
-- Explore from a selected code result without leaving the picker
-- Back/forward navigation through in-session explore history
-- Explicitly add the current target or explore path to Trail
-- Toggleable bottom keyhint bar that gives rows back to the panes
-- Trail facet for pinned breadcrumbs
+- Facet rail, dense result rows, badges, and grouped headers
+- Syntax-highlighted preview with project-relative context
+- `e` pivots from the selected code row without leaving the picker
+- `b` / `f` move backward and forward through explore history
+- Top bar shows the selected row's explore target before pivoting
+- Trail pins selected rows, current targets, and explore paths
 - Persistent named Trails per project
-- Explicit resume for the last active saved Trail
-- Progressive, cancelable LSP loading plus async tests and git loading
-- Local filter with negation and phrase matching
-- Jump actions
+- Toggleable bottom key hints
+- Progressive, cancelable LSP, test, text, and git sources
+- Local filter with negation and quoted phrases
 
 ## Requirements
 
 - Neovim `0.10+`
+- `ripgrep` for Text Matches
+- `git` for the Git facet
 
 ## Installation
 
@@ -60,30 +56,77 @@ With `lazy.nvim`:
 
 ## Quick Start
 
-Wayfinder works with the default setup:
-
 ```lua
 require("wayfinder").setup({})
-vim.keymap.set("n", "<leader>wf", "<Plug>(WayfinderOpen)", { desc = "Wayfinder" })
+
+vim.keymap.set("n", "<leader>wf", "<Plug>(WayfinderOpen)", {
+  desc = "Wayfinder",
+})
 ```
 
-Open it on a symbol for definitions, references, callers, likely tests, and recent commits.
-If there is no symbol under the cursor, it falls back to the current file.
+Open Wayfinder on a symbol to see definitions, references, callers, likely tests, and recent commits.
+If there is no symbol under the cursor, Wayfinder falls back to the current file.
 
 ## Typical Flow
 
 1. Open Wayfinder on the current symbol or file.
 2. Move across `Calls`, `Refs`, `Tests`, `Git`, and `Trail`.
 3. Use preview to confirm the right match before jumping.
-4. Press `e` on a code result to explore outward from that symbol/location.
-5. Use `b` / `f` to move backward and forward through explored targets.
-6. Use `a` to add the current target to Trail, or `A` to add the current explore path.
-7. Pin useful rows into Trail with `p` while exploring.
-8. Save, reload, or resume a Trail later if you want to keep that exploration path.
+4. Press `e` to explore from the selected code result.
+5. Use `b` / `f` to move through explore history.
+6. Use `a` to add the current target to Trail, or `A` to add the whole explore path.
+7. Pin selected rows with `p`.
+8. Save, load, or resume a Trail if you want to keep that path.
 
-## Optional Setup
+## Default Keys
 
-If you want to tune the layout, keep it small:
+| Key | Action |
+| --- | --- |
+| `j` / `k` | Move selection |
+| `gg` / `G` | First / last result |
+| `<C-u>` / `<C-d>` | Move by half a page |
+| `h` / `l` | Previous / next facet |
+| `<Tab>` / `<S-Tab>` | Next / previous facet |
+| `<CR>` | Jump |
+| `e` | Explore selected code result |
+| `b` / `f` | Back / forward through explore history |
+| `p` | Pin selected row into Trail |
+| `a` | Add current Wayfinder target to Trail |
+| `A` | Add current explore path to Trail |
+| `P` | Open Trail |
+| `S` | Open Trail menu |
+| `[` / `]` | Previous / next saved Trail |
+| `s` / `v` / `t` | Open in split / vsplit / tab |
+| `/` / `<C-l>` | Filter / clear filter |
+| `D` | Toggle details |
+| `?` | Toggle bottom key hints |
+| `x` | Export current facet to quickfix |
+| `dd` / `da` | Remove Trail item / clear Trail |
+| `r` | Refresh |
+| `q` | Close |
+
+## Trail
+
+Trail is the breadcrumb list you build while exploring.
+
+- `p` pins the selected row.
+- `a` pins the current Wayfinder target.
+- `A` pins the current explore path.
+- Trail groups explicit explore targets separately from selected row pins.
+- `S` opens save, resume, load, rename, and delete actions.
+- Saved Trails are project-scoped and stored under Neovim state, not in your repo.
+
+Normal `:Wayfinder` opens do not auto-load saved Trails. Use `:WayfinderTrailResume` or the Trail menu when you want to restore the last active saved Trail.
+
+## Explore
+
+`e` pivots Wayfinder from the selected code row. The top bar shows what will be explored, such as `Explore findUser`, before the pivot happens.
+
+`D` details include the exact explore target location when there is room. Git rows are history rows, so they explain why they cannot be explored instead of pivoting.
+
+## Configuration
+
+Default setup is enough for normal repos. A small layout tweak looks like this:
 
 ```lua
 require("wayfinder").setup({
@@ -95,21 +138,7 @@ require("wayfinder").setup({
 })
 ```
 
-## Large Repos and Monorepos
-
-You do not need to set any scope or performance options for normal repos.
-
-If you work in a large repo or monorepo, Wayfinder can narrow broad sources like
-text matches, likely tests, and git history, while keeping slow LSP work bounded.
-
-Mental model:
-
-- `project`: search the whole project, usually the git root
-- `package`: search the nearest app/package/module root
-- `cwd`: search from the current Neovim working directory
-- `file_dir`: search from the current file directory
-
-Common monorepo setup:
+For large repos or monorepos, narrow broad sources to the nearest package/module:
 
 ```lua
 require("wayfinder").setup({
@@ -125,42 +154,24 @@ require("wayfinder").setup({
       ".git",
     },
   },
-  limits = {
-    refs = { max_results = 200, timeout_ms = 1200 },
-    text = { enabled = true, max_results = 100, timeout_ms = 800 },
-    tests = { max_results = 50, timeout_ms = 700 },
-    git = { enabled = true, max_commits = 15, timeout_ms = 400 },
-  },
 })
 ```
 
-Those `package_markers` are just common defaults. They are not required files, and you can override them if your repo uses different boundaries.
-
-`performance` presets:
+Performance presets:
 
 - `fast`: tighter limits and shorter timeouts
 - `balanced`: default behavior
 - `full`: broader limits and looser timeouts
 
-## Recommended Mappings
-
-```lua
-vim.keymap.set("n", "<leader>wf", "<Plug>(WayfinderOpen)", { desc = "Wayfinder" })
-vim.keymap.set("n", "<leader>wtn", "<Plug>(WayfinderTrailNext)", { desc = "Wayfinder Trail Next" })
-vim.keymap.set("n", "<leader>wtp", "<Plug>(WayfinderTrailPrev)", { desc = "Wayfinder Trail Prev" })
-vim.keymap.set("n", "<leader>wto", "<Plug>(WayfinderTrailOpen)", { desc = "Wayfinder Trail Open" })
-vim.keymap.set("n", "<leader>wts", "<Plug>(WayfinderTrailShow)", { desc = "Wayfinder Trail Show" })
-```
-
 ## Commands
 
-Core:
+Core commands:
 
 - `:Wayfinder`
 - `:WayfinderExportQuickfix`
 - `:WayfinderExportTrailQuickfix`
 
-Trail:
+Trail commands:
 
 - `:WayfinderTrailNext`
 - `:WayfinderTrailPrev`
@@ -173,133 +184,24 @@ Trail:
 - `:WayfinderTrailDelete`
 - `:WayfinderTrailRename`
 
-Mappings:
+Recommended external mappings:
 
-- `<Plug>(WayfinderOpen)`
-- `<Plug>(WayfinderTrailNext)`
-- `<Plug>(WayfinderTrailPrev)`
-- `<Plug>(WayfinderTrailOpen)`
-- `<Plug>(WayfinderTrailShow)`
+```lua
+vim.keymap.set("n", "<leader>wf", "<Plug>(WayfinderOpen)", { desc = "Wayfinder" })
+vim.keymap.set("n", "<leader>wtn", "<Plug>(WayfinderTrailNext)", { desc = "Wayfinder Trail Next" })
+vim.keymap.set("n", "<leader>wtp", "<Plug>(WayfinderTrailPrev)", { desc = "Wayfinder Trail Prev" })
+vim.keymap.set("n", "<leader>wto", "<Plug>(WayfinderTrailOpen)", { desc = "Wayfinder Trail Open" })
+vim.keymap.set("n", "<leader>wts", "<Plug>(WayfinderTrailShow)", { desc = "Wayfinder Trail Show" })
+```
 
-## Default Keys
+## Help
 
-- `j` / `k` move
-- `gg` / `G` first / last result
-- `<PageUp>` / `<PageDown>` page movement
-- `<C-u>` / `<C-d>` move by half a page
-- `h` / `l` switch facet
-- `<Tab>` next facet
-- `<S-Tab>` previous facet
-- `<CR>` jump
-- `e` explore selected code result
-- `b` / `f` back / forward through explore history
-- `a` add current target to Trail
-- `A` add current explore path to Trail
-- `s` open in split
-- `v` open in vsplit
-- `t` open in tab
-- `p` pin into Trail
-- `P` open Trail immediately
-- `S` open Trail menu
-- `[` previous saved Trail
-- `]` next saved Trail
-- `x` export current facet to quickfix
-- `dd` remove pinned trail item
-- `da` clear Trail
-- `/` filter
-- `<C-l>` clear filter
-- `D` toggle details
-- `?` toggle bottom key hints
-- `r` refresh
-- `q` close
-- mouse wheel scrolls results
+For full behavior and configuration details:
 
-## Trail
-
-Trail is the working breadcrumb list you build while exploring.
-
-Core Trail actions:
-
-- `p` pins the selected row
-- `a` pins the current Wayfinder target
-- `A` pins the current explore path
-- Trail groups explore targets separately from selected row pins
-- `P` opens the Trail facet
-- `S` opens the Trail menu for save/resume/load/rename/delete actions
-- `[` / `]` cycle through saved Trails for the current project
-- `dd` removes the selected Trail item
-- `da` clears the current Trail
-
-Facet hopping within one open Wayfinder session remembers the last selected item per facet when it still exists.
-
-Trail commands outside Wayfinder:
-
-- `:WayfinderTrailNext` opens the next Trail item
-- `:WayfinderTrailPrev` opens the previous Trail item
-- `:WayfinderTrailOpen` opens the current Trail item
-- `:WayfinderTrailShow` opens Wayfinder on the Trail facet
-- `:WayfinderTrailResume` loads the last active saved Trail for the current project
-
-Persistent named Trails:
-
-- saved Trails are project-scoped and stored under Neovim state, not in your repo
-- nothing persists automatically just because you pin items
-- normal `:Wayfinder` opens do not auto-load saved Trails
-- if you never save a Trail, ordinary Trail behavior stays the same
-- `:WayfinderTrailSave` saves the current working Trail
-- `:WayfinderTrailSaveAs` saves the current working Trail under a different name
-- `:WayfinderTrailLoad` loads a saved Trail back into the current working Trail
-- `:WayfinderTrailResume` loads the most recently saved or loaded Trail for this project
-- `:WayfinderTrailRename` renames a saved Trail
-- `:WayfinderTrailDelete` deletes a saved Trail entry
-- once a saved Trail is loaded, `Save Trail` updates that same saved Trail and `Save Trail As` creates a named variant
-
-Top bar Trail states:
-
-- `Trail (2 saved)`
-- `Trail (2 saved) • unsaved`
-- `Trail (3 saved): auth bug`
-- `Trail (3 saved): auth bug • modified`
-
-Filter examples:
-
-- `user` matches `user`
-- `user test` requires both terms
-- `user !spec` excludes matches containing `spec`
-- `"user service"` matches that exact phrase
-- `create !"git status"` excludes that exact phrase
-
-Quickfix export:
-
-- `:WayfinderExportQuickfix` exports the current visible facet in its current order
-- `:WayfinderExportTrailQuickfix` exports Trail in Trail order
-
-## Result Types
-
-- `Calls` shows LSP definitions and callers
-- `Refs` is split into `LSP References` and `Text Matches`
-- LSP-backed rows can appear progressively while slower reference/caller work is still loading
-- weak-source reasons now show up in the top bar for the current selection
-- `Tests` is heuristic and intentionally ranked below calls and refs
-- `Tests` targets a likely test block or symbol mention when it can find one
-- `Tests` can show a small heuristic reason like filename, test-block, or symbol-text matching
-- `Git` shows recent commits touching the current file
-- `Git` can show a small file-touch reason while commit metadata stays in details
-
-## Scope and Performance
-
-- `scope.mode` controls how far Wayfinder searches:
-  - `project` uses the project root
-  - `cwd` uses the current Neovim working directory
-  - `package` uses the nearest package/module marker
-  - `file_dir` uses the current file directory
-- `limits` can cap expensive sources without changing the UI model:
-  - `refs.max_results`, `refs.timeout_ms`
-  - `text.enabled`, `text.max_results`, `text.timeout_ms`
-  - `tests.max_results`, `tests.timeout_ms`
-  - `git.enabled`, `git.max_commits`, `git.timeout_ms`
-
-With package scope enabled, Wayfinder keeps text matches, likely tests, and other broad searches inside the nearest app or module instead of spilling across the full repo.
+```vim
+:help wayfinder
+:checkhealth wayfinder
+```
 
 ## Demo Fixture
 
@@ -312,26 +214,6 @@ nvim -u demo/minimal_init.lua demo/fixture-app/src/user_service.ts
 Move the cursor onto `createUser`, then run `:Wayfinder`.
 
 More demo notes are in [demo/README.md](demo/README.md).
-
-## Health
-
-`:checkhealth wayfinder` reports:
-
-- Neovim version
-- plugin load status
-- `ripgrep` availability for Text Matches
-- `git` availability for the Git facet
-- active LSP clients for the current buffer
-- resolved scope root for the current buffer
-- saved Trail storage root
-- saved Trail storage file for the current project
-- saved Trail count for the current project
-- last active saved Trail for the current project
-- current `performance` and `scope.mode` config
-
-```vim
-:checkhealth wayfinder
-```
 
 ## License
 

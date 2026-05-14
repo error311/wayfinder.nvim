@@ -306,6 +306,130 @@ test("top bar fits available width with long status segments", function()
   state.current = nil
 end)
 
+test("selected rows show the explore target before pivoting", function()
+  -- Guards the e-pivot affordance so selected rows describe the actual symbol/location Wayfinder will explore.
+  local file = fixture_root .. "/src/user_service.ts"
+  local session = {
+    mode = "symbol",
+    subject = "createUser",
+    path = file,
+    project_root = fixture_root,
+    cwd = fixture_root,
+    scope = nil,
+    facet = "refs",
+    filter = "",
+    selection_index = 1,
+    selection_id = "ref-find-user",
+    visible_items = {
+      {
+        id = "ref-find-user",
+        facet = "refs",
+        label = "export function findUser(id: string) {",
+        path = file,
+        lnum = 8,
+        col = 18,
+        source = "lsp",
+        detail = "src/user_service.ts",
+        secondary = "src/user_service.ts:8",
+      },
+    },
+    counts = {
+      all = 1,
+      calls = 0,
+      refs = 1,
+      tests = 0,
+      git = 0,
+      trail = 0,
+    },
+    loading = false,
+    show_details = true,
+    row_actions = {},
+    list_line_count = 0,
+  }
+
+  state.current = session
+  state.notice = { text = nil, expires_at = 0 }
+  layout.render(session)
+
+  local top_line = vim.api.nvim_buf_get_lines(state.ui.top_buf, 0, 1, false)[1] or ""
+  assert_ok(
+    string.find(top_line, "Explore findUser", 1, true) ~= nil,
+    "expected selected row explore target in top bar"
+  )
+
+  local saved_list_width = config.values.layout.list_width
+  config.values.layout.list_width = 120
+  local detail_rows = require("wayfinder.render.list").rows(session)
+  config.values.layout.list_width = saved_list_width
+  local list_lines = table.concat(detail_rows, "\n")
+  assert_ok(
+    string.find(list_lines, "Explore findUser", 1, true) ~= nil,
+    "expected selected row explore target in details"
+  )
+
+  layout.close()
+  state.current = nil
+end)
+
+test("non-code explore rows explain why they cannot pivot", function()
+  -- Guards git rows so e gives a concrete reason instead of failing silently.
+  local file = fixture_root .. "/src/user_service.ts"
+  local session = {
+    mode = "symbol",
+    subject = "createUser",
+    path = file,
+    project_root = fixture_root,
+    cwd = fixture_root,
+    bufnr = vim.api.nvim_get_current_buf(),
+    origin_win = vim.api.nvim_get_current_win(),
+    scope = nil,
+    facet = "git",
+    filter = "",
+    selection_index = 1,
+    selection_id = "git-row",
+    visible_items = {
+      {
+        id = "git-row",
+        facet = "git",
+        source = "git",
+        kind = "commit",
+        label = "fixture commit",
+        path = file,
+        lnum = 1,
+        col = 1,
+      },
+    },
+    counts = {
+      all = 1,
+      calls = 0,
+      refs = 0,
+      tests = 0,
+      git = 1,
+      trail = 0,
+    },
+    loading = false,
+    show_details = false,
+    row_actions = {},
+    list_line_count = 0,
+    history = { back = {}, forward = {} },
+  }
+
+  state.current = session
+  state.notice = { text = nil, expires_at = 0 }
+  layout.render(session)
+
+  wayfinder.explore(session.visible_items[1])
+
+  assert_ok(state.current == session, "git row explore should keep the current session")
+  assert_ok(
+    string.find(state.notice_text() or "", "file history", 1, true) ~= nil,
+    "expected non-code explore reason in picker notice"
+  )
+
+  layout.close()
+  state.current = nil
+end)
+
 test("hint bar toggle gives pane rows back and remembers runtime preference", function()
   -- Guards the learned-user path so key hints can get out of the way without wasting layout space.
   local saved_show_hints = config.values.layout.show_hints

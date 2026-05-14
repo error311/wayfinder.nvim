@@ -5,6 +5,7 @@ local list = require("wayfinder.render.list")
 local preview = require("wayfinder.render.preview")
 local trail_persistence = require("wayfinder.trail_persistence")
 local debounce = require("wayfinder.util.debounce")
+local explore_target = require("wayfinder.util.explore_target")
 local paths = require("wayfinder.util.paths")
 local text_util = require("wayfinder.util.text")
 
@@ -616,6 +617,11 @@ function M.render(session)
   local filter_label = session.filter ~= "" and ("/" .. session.filter) or nil
   local selected_item = session.visible_items[session.selection_index]
   local reason_label = selected_item and selected_item.reason or nil
+  local explore_label = selected_item
+      and explore_target.resolve(selected_item, {
+        project_root = session.project_root or session.cwd,
+      }).top_label
+    or nil
   local top_width = state.ui.top
       and vim.api.nvim_win_is_valid(state.ui.top)
       and vim.api.nvim_win_get_width(state.ui.top)
@@ -659,6 +665,13 @@ function M.render(session)
   if reason_label then
     table.insert(top_segments, { text = separator })
     table.insert(top_segments, { text = reason_label, group = "WayfinderDim", truncate = "end" })
+  end
+  if explore_label then
+    table.insert(top_segments, { text = separator })
+    table.insert(
+      top_segments,
+      { text = explore_label, group = "WayfinderHeader", truncate = "end" }
+    )
   end
   if source_file and source_file ~= "" and source_file ~= subject then
     table.insert(top_segments, { text = separator })

@@ -1,5 +1,16 @@
 # Changelog
 
+## v0.2.8 - 2026-05-14
+
+Explore pivots are clearer before you press `e`.
+
+- The top bar now shows the selected row's explore target, such as `Explore findUser`.
+- Details mode includes the exact explore target location for the selected row when there is room.
+- `e` uses the same target resolution shown in the UI, resolving symbols at code-row locations and falling back to file locations when no symbol is available.
+- Non-code rows now explain why they cannot be explored inside the picker.
+
+---
+
 ## v0.2.7 - 2026-05-13
 
 The bottom keyhint bar can now get out of the way after the commands are familiar.
