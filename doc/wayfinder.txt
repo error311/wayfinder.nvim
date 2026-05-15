@@ -44,6 +44,9 @@ current target to Trail, or `A` to add the current explore path.
 Git rows are history rows and explain why they cannot be explored.
 If no symbol is detected under the cursor, it falls back to the current file.
 Use `?` to hide or show the bottom keyhint bar.
+When a source is loading, empty, or unavailable, Wayfinder shows a compact
+state row in the list. State rows preview their reason but do not jump,
+explore, pin, or export as code locations.
 
 ==============================================================================
 2. Command                                             *wayfinder-command*
@@ -252,9 +255,9 @@ Top bar Trail states can look like:
   Trail (3 saved): auth bug
   Trail (3 saved): auth bug • modified
 
-If Trail is empty, Wayfinder shows:
+If Trail is empty, Wayfinder shows a compact state row:
 
-  Wayfinder: Trail is empty
+  Trail is empty
 
 ==============================================================================
 5. Configuration                                        *wayfinder-config*
@@ -344,6 +347,8 @@ Limits:
 
   Calls
       LSP definitions and callers for the symbol under the cursor.
+      Empty or unavailable states explain missing LSP support or lack of call
+      targets.
 
   Refs
       Split into LSP References and Text Matches.
@@ -351,17 +356,22 @@ Limits:
       caller work is still loading.
       Text Matches can surface a small plain-text fallback reason in the top
       bar for the current selection.
+      Empty or unavailable states explain missing LSP, disabled text fallback,
+      or missing `rg`.
 
   Tests
       Heuristic likely-test matches for the file or symbol.
       Test rows target a likely test block or symbol mention when possible.
       Test matches can surface a small heuristic reason such as filename,
       test-block, or symbol text matching.
+      Empty states say when no likely tests matched.
 
   Git
       Recent commits touching the current file.
       Git selections can surface a small file-touch reason while commit
       metadata stays in details.
+      Empty or unavailable states explain disabled Git, files outside a repo,
+      or no recent commits.
 
 ==============================================================================
 7. Demo                                                  *wayfinder-demo*

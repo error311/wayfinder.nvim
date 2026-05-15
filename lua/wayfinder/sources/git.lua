@@ -28,14 +28,18 @@ end
 
 function M.collect(ctx, callback)
   local git_limits = config.values.limits.git
-  if not git_limits.enabled or not ctx.path then
-    callback({})
+  if not git_limits.enabled then
+    callback({}, { status = "unavailable", reason = "Git source is disabled." })
+    return
+  end
+  if not ctx.path then
+    callback({}, { status = "unavailable", reason = "No file path is available for git history." })
     return
   end
 
   resolve_repo(ctx, function(repo_root, relative)
     if not repo_root or not relative then
-      callback({})
+      callback({}, { status = "unavailable", reason = "Current file is not inside a git repo." })
       return
     end
 
@@ -49,7 +53,7 @@ function M.collect(ctx, callback)
       relative,
     }, { cwd = repo_root, timeout_ms = git_limits.timeout_ms }, function(result)
       if result.timed_out or result.code ~= 0 then
-        callback({})
+        callback({}, { status = "unavailable", reason = "Git history did not finish in time." })
         return
       end
 

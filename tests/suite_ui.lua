@@ -10,6 +10,7 @@ local trail = t.trail
 local trail_persistence = t.trail_persistence
 local fixture_root = t.fixture_root
 local open_typescript = t.open_typescript
+local stop_lsp_clients = t.stop_lsp_clients
 local preview = require("wayfinder.render.preview")
 local async = require("wayfinder.util.async")
 local config = require("wayfinder.config")
@@ -427,6 +428,99 @@ test("non-code explore rows explain why they cannot pivot", function()
   )
 
   layout.close()
+  state.current = nil
+end)
+
+test("state rows explain loading and unavailable sources without acting like code", function()
+  -- Guards v0.2.9 state rows so empty/loading/unavailable facets stay visible but inert.
+  local root = vim.fs.normalize(vim.fn.tempname())
+  vim.fn.mkdir(root, "p")
+  local file = root .. "/lonely.ts"
+  vim.fn.writefile({
+    "export function lonelyTarget() {",
+    "  return true;",
+    "}",
+  }, file)
+
+  vim.cmd.edit(file)
+  local bufnr = vim.api.nvim_get_current_buf()
+  vim.bo[bufnr].filetype = "typescript"
+  stop_lsp_clients(bufnr)
+  vim.api.nvim_win_set_cursor(0, { 1, 18 })
+  trail.clear()
+
+  wayfinder.open()
+  assert_ok(state.current.visible_items[1].kind == "state", "expected initial state row")
+  assert_ok(
+    state.current.visible_items[1].label == "Loading LSP...",
+    "expected source-aware loading state"
+  )
+  assert_ok(
+    string.find(
+      vim.api.nvim_buf_get_lines(state.ui.top_buf, 0, 1, false)[1] or "",
+      "Loading LSP...",
+      1,
+      true
+    ) ~= nil,
+    "expected source-aware loading state in top bar"
+  )
+  assert_ok(
+    string.find(
+      vim.api.nvim_buf_get_lines(state.ui.top_buf, 0, 1, false)[1] or "",
+      "0 results",
+      1,
+      true
+    ) ~= nil,
+    "expected state row not to count as a real result"
+  )
+
+  t.await(function()
+    return state.current and state.current.loading == false
+  end, 2500, "state row session did not finish loading")
+
+  state.current:refresh_visible()
+  layout.render(state.current)
+  local item = state.current.visible_items[1]
+  assert_ok(item.kind == "state", "expected unavailable state row")
+  assert_ok(item.label == "Calls unavailable", "expected calls unavailable state")
+  preview.render(state.current, state.ui.preview, item)
+  local preview_lines =
+    table.concat(vim.api.nvim_buf_get_lines(state.ui.preview_buf, 0, -1, false), "\n")
+  assert_ok(
+    string.find(preview_lines, "No LSP client", 1, true) ~= nil,
+    "expected state row preview to explain the reason"
+  )
+
+  actions.jump()
+  assert_ok(state.current ~= nil, "jump on a state row should keep Wayfinder open")
+
+  actions.pin()
+  assert_ok(#trail.items() == 0, "pin on a state row should not mutate Trail")
+
+  wayfinder.explore(item)
+  assert_ok(
+    string.find(state.notice_text() or "", "No LSP client", 1, true) ~= nil,
+    "explore on a state row should explain why it cannot pivot"
+  )
+
+  actions.export_quickfix()
+  assert_ok(#vim.fn.getqflist() == 0, "state rows should not export to quickfix")
+
+  state.current.facet = "git"
+  state.current.selection_id = nil
+  state.current.selection_index = 1
+  state.current:refresh_visible()
+  layout.render(state.current)
+  assert_ok(
+    state.current.visible_items[1].label == "No recent commits found"
+      or state.current.visible_items[1].label == "Git unavailable",
+    "expected compact git empty or unavailable state"
+  )
+
+  layout.close()
+  if state.current and state.current.cancel then
+    state.current:cancel()
+  end
   state.current = nil
 end)
 

@@ -179,7 +179,7 @@ function M.rows(session)
         secondary_parts[#secondary_parts + 1] = item.detail
       end
     end
-    if selected and session.show_details then
+    if selected and session.show_details and item.kind ~= "state" then
       secondary_parts[#secondary_parts + 1] = explore_target.resolve(item, {
         project_root = session.project_root or session.cwd,
       }).detail_label

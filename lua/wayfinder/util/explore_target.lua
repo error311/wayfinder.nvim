@@ -15,6 +15,16 @@ end
 
 function M.resolve(item, opts)
   opts = opts or {}
+  if item and item.kind == "state" then
+    return {
+      explorable = false,
+      label = item.label or "State row",
+      top_label = "Explore unavailable",
+      detail_label = item.detail or item.reason or "Explore unavailable",
+      reason = item.detail or item.reason or "State rows cannot be explored",
+    }
+  end
+
   if not item or not item.path or item.path == "" then
     return {
       explorable = false,

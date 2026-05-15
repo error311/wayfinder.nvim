@@ -1,5 +1,16 @@
 # Changelog
 
+## v0.2.9 - 2026-05-15
+
+Empty, loading, and unavailable states now explain themselves inside the picker.
+
+- Empty facets now show compact state rows such as `No references found`, `No likely tests found`, or `Trail is empty`.
+- Loading rows and the top bar now name the pending source, such as `Loading LSP...`.
+- Missing or unavailable sources now surface small reasons, including no LSP client, disabled text fallback, missing `rg`, disabled Git, or files outside a Git repo.
+- State rows preview their explanation but do not jump, explore, pin, or export to quickfix.
+
+---
+
 ## v0.2.8 - 2026-05-14
 
 Explore pivots are clearer before you press `e`.

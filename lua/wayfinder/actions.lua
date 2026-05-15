@@ -186,6 +186,15 @@ local function export_notice(session, message)
   end
 end
 
+local function state_item_notice(item)
+  if not item or item.kind ~= "state" then
+    return false
+  end
+
+  export_notice(current(), item.detail or item.reason or item.label or "Wayfinder state row")
+  return true
+end
+
 local function normalize_name(name)
   if type(name) ~= "string" then
     return nil
@@ -537,6 +546,9 @@ end
 
 local function open_item(item, opener)
   local session = current()
+  if state_item_notice(item) then
+    return
+  end
   if not session or not item or not item.path then
     return
   end
@@ -589,6 +601,9 @@ end
 
 function M.pin()
   local item = selection_item()
+  if state_item_notice(item) then
+    return
+  end
   if item and trail.pin(item) then
     local trail_count = #trail.items()
     state.set_notice(

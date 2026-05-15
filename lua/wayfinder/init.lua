@@ -18,6 +18,12 @@ local sources = {
 
 local M = {}
 
+local source_labels = {
+  lsp = "LSP",
+  tests = "tests",
+  git = "git",
+}
+
 local function remember_facet_selection(session)
   if not session or not session.facet then
     return
@@ -167,6 +173,153 @@ local function build_counts(session)
   session.counts = counts
 end
 
+local function source_loading(session, source_name)
+  return vim.tbl_get(session, "results", source_name, "loading") == true
+end
+
+local function loading_sources(session)
+  if session.facet == "calls" or session.facet == "refs" then
+    return source_loading(session, "lsp") and { "lsp" } or {}
+  end
+  if session.facet == "tests" then
+    return source_loading(session, "tests") and { "tests" } or {}
+  end
+  if session.facet == "git" then
+    return source_loading(session, "git") and { "git" } or {}
+  end
+  if session.facet == "trail" then
+    return {}
+  end
+
+  local pending = {}
+  for _, source_name in ipairs({ "lsp", "tests", "git" }) do
+    if source_loading(session, source_name) then
+      pending[#pending + 1] = source_name
+    end
+  end
+  return pending
+end
+
+local function loading_label(session)
+  local pending = loading_sources(session)
+  if #pending == 0 then
+    return nil
+  end
+  if #pending == 1 then
+    return "Loading " .. source_labels[pending[1]] .. "..."
+  end
+  return "Loading connected code..."
+end
+
+local function has_lsp_client(session)
+  return session and session.bufnr and #vim.lsp.get_clients({ bufnr = session.bufnr }) > 0
+end
+
+local function source_meta(session, source_name)
+  return vim.tbl_get(session, "results", source_name, "meta") or {}
+end
+
+local function state_item(id, label, detail)
+  return {
+    id = "state::" .. id,
+    facet = "state",
+    kind = "state",
+    source = "state",
+    label = label,
+    detail = detail,
+    secondary = detail,
+    reason = detail,
+    icon = "·",
+  }
+end
+
+local function empty_state_item(session)
+  local loading = loading_label(session)
+  if loading then
+    return state_item("loading::" .. session.facet, loading, "Wayfinder is still gathering rows.")
+  end
+
+  if session.facet == "trail" then
+    return state_item(
+      "empty::trail",
+      "Trail is empty",
+      "Pin rows with p, targets with a, or paths with A."
+    )
+  end
+
+  if session.filter and session.filter ~= "" then
+    return state_item(
+      "empty::filter",
+      "No matches for /" .. session.filter,
+      "Clear the filter with <C-l> or search for a different term."
+    )
+  end
+
+  if session.facet == "calls" then
+    if not has_lsp_client(session) then
+      return state_item(
+        "unavailable::calls::lsp",
+        "Calls unavailable",
+        "No LSP client is attached for definitions or call hierarchy."
+      )
+    end
+    return state_item(
+      "empty::calls",
+      "No calls or definitions found",
+      "LSP did not return call targets."
+    )
+  end
+
+  if session.facet == "refs" then
+    local text_limits = config.values.limits.text
+    if not has_lsp_client(session) and text_limits.enabled == false then
+      return state_item(
+        "unavailable::refs::text-disabled",
+        "References unavailable",
+        "No LSP client is attached and text fallback is disabled."
+      )
+    end
+    if not has_lsp_client(session) and vim.fn.executable("rg") ~= 1 then
+      return state_item(
+        "unavailable::refs::rg",
+        "References unavailable",
+        "No LSP client is attached and rg is not available."
+      )
+    end
+    return state_item(
+      "empty::refs",
+      "No references found",
+      "No semantic or text references matched."
+    )
+  end
+
+  if session.facet == "tests" then
+    local meta = source_meta(session, "tests")
+    if meta.status == "unavailable" then
+      return state_item("unavailable::tests", "Tests unavailable", meta.reason)
+    end
+    return state_item(
+      "empty::tests",
+      "No likely tests found",
+      "No test candidates matched this target."
+    )
+  end
+
+  if session.facet == "git" then
+    local meta = source_meta(session, "git")
+    if meta.status == "unavailable" then
+      return state_item("unavailable::git", "Git unavailable", meta.reason)
+    end
+    return state_item(
+      "empty::git",
+      "No recent commits found",
+      "Git returned no commits for this file."
+    )
+  end
+
+  return state_item("empty::all", "No connected code found", "All sources finished without rows.")
+end
+
 local function filtered_items(session)
   local all_items = {}
   for _, item in ipairs(session.items) do
@@ -215,13 +368,20 @@ local function filtered_items(session)
   end
 
   if session.filter == "" then
+    if #all_items == 0 then
+      return { empty_state_item(session) }
+    end
     return all_items
   end
 
   local query = filter.parse(session.filter)
-  return vim.tbl_filter(function(item)
+  local matched = vim.tbl_filter(function(item)
     return filter.match(item, query)
   end, all_items)
+  if #matched == 0 then
+    return { empty_state_item(session) }
+  end
+  return matched
 end
 
 local function refresh_visible(session)
@@ -269,6 +429,7 @@ local function aggregate_items(session)
   session.loading = session.results.lsp.loading
     or session.results.tests.loading
     or session.results.git.loading
+  session.loading_label = loading_label(session)
   refresh_visible(session)
 end
 
@@ -370,10 +531,11 @@ local function create_session(opts)
     },
     items = {},
     visible_items = {},
+    loading_label = "Loading connected code...",
     results = {
-      lsp = { loading = true, items = {} },
-      tests = { loading = true, items = {} },
-      git = { loading = true, items = {} },
+      lsp = { loading = true, items = {}, meta = {} },
+      tests = { loading = true, items = {}, meta = {} },
+      git = { loading = true, items = {}, meta = {} },
     },
     pending = {},
   }
@@ -399,7 +561,7 @@ local function create_session(opts)
   return session, target
 end
 
-local function update_session(session, source_name, source_items)
+local function update_session(session, source_name, source_items, source_meta)
   if state.current ~= session or session.closed then
     return
   end
@@ -407,6 +569,7 @@ local function update_session(session, source_name, source_items)
   session.results[source_name] = {
     loading = false,
     items = source_items or {},
+    meta = source_meta or {},
   }
   session.pending[source_name] = nil
   aggregate_items(session)
@@ -420,7 +583,7 @@ local function update_session(session, source_name, source_items)
   end
 end
 
-local function update_session_partial(session, source_name, source_items)
+local function update_session_partial(session, source_name, source_items, source_meta)
   if state.current ~= session or session.closed then
     return
   end
@@ -428,6 +591,7 @@ local function update_session_partial(session, source_name, source_items)
   session.results[source_name] = {
     loading = true,
     items = source_items or {},
+    meta = source_meta or {},
   }
   aggregate_items(session)
   if state.ui_suspended then
@@ -448,7 +612,11 @@ local function load_source(session, target, symbol, source_name)
   local key = source_name .. "::" .. source_key(target, symbol)
   local cached = state.cache_get(key, config.values.cache_ttl_ms)
   if cached then
-    update_session(session, source_name, cached)
+    if cached.__wayfinder_source_cache then
+      update_session(session, source_name, cached.items, cached.meta)
+    else
+      update_session(session, source_name, cached)
+    end
     return
   end
 
@@ -465,15 +633,19 @@ local function load_source(session, target, symbol, source_name)
     is_stale = function()
       return session.closed or state.current ~= session
     end,
-    on_partial = function(found)
-      update_session_partial(session, source_name, found or {})
+    on_partial = function(found, meta)
+      update_session_partial(session, source_name, found or {}, meta or {})
     end,
-  }, function(found)
+  }, function(found, meta)
     if session.closed or state.current ~= session then
       return
     end
-    state.cache_set(key, found or {})
-    update_session(session, source_name, found or {})
+    state.cache_set(key, {
+      __wayfinder_source_cache = true,
+      items = found or {},
+      meta = meta or {},
+    })
+    update_session(session, source_name, found or {}, meta or {})
   end)
 
   if handle then

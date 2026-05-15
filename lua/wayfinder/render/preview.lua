@@ -253,6 +253,15 @@ function M.render(session, winid, item)
     return
   end
 
+  if item.kind == "state" then
+    render_lines(session, nil, "", {
+      "  " .. (item.label or "Wayfinder"),
+      "",
+      "  " .. (item.detail or item.reason or "No code location is available."),
+    })
+    return
+  end
+
   if item.source == "git" and item.git then
     render_lines(session, item, "", {
       "  Loading git preview…",

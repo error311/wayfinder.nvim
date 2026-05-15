@@ -130,6 +130,14 @@ end
 
 function M.collect(ctx, callback)
   file_candidates(ctx, function(candidates)
+    if #candidates == 0 then
+      callback(
+        {},
+        { status = "unavailable", reason = "No candidate files found in the current scope." }
+      )
+      return
+    end
+
     local results = {}
     local limit = config.values.limits.tests.max_results
 

@@ -637,7 +637,7 @@ end
 
 function M.collect(ctx, callback)
   if not ctx.symbol then
-    callback({})
+    callback({}, { status = "unavailable", reason = "No symbol target for LSP sources." })
     return {
       cancel = function() end,
     }
@@ -651,6 +651,11 @@ function M.collect(ctx, callback)
   ---@type uv.uv_timer_t?
   local timer = nil
   local refs_timeout_ms = vim.tbl_get(config.values, "limits", "refs", "timeout_ms")
+  local meta = {
+    no_lsp = #vim.lsp.get_clients({ bufnr = ctx.bufnr }) == 0,
+    text_disabled = config.values.limits.text.enabled == false,
+    rg_missing = vim.fn.executable("rg") ~= 1,
+  }
 
   local control = vim.tbl_extend("force", ctx, {
     is_stale = function()
@@ -674,7 +679,7 @@ function M.collect(ctx, callback)
     for _, cancel in ipairs(cancelers) do
       pcall(cancel)
     end
-    callback(sorted(results))
+    callback(sorted(results), meta)
   end
 
   local function push(part)

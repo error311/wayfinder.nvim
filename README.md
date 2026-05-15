@@ -35,6 +35,7 @@ Pin useful stops into Trail while you explore, then save that Trail per project 
 - Persistent named Trails per project
 - Toggleable bottom key hints
 - Progressive, cancelable LSP, test, text, and git sources
+- Compact loading, empty, and unavailable states
 - Local filter with negation and quoted phrases
 
 ## Requirements

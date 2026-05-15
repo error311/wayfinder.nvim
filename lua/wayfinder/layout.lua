@@ -602,8 +602,15 @@ function M.render(session)
   elseif saved_trail_count and saved_trail_count > 0 then
     trail_label = string.format("Trail (%d saved)", saved_trail_count)
   end
-  local count_label = string.format("%d results", #session.visible_items)
-  local loading_label = session.loading and "loading…" or nil
+  local visible_count = 0
+  for _, item in ipairs(session.visible_items or {}) do
+    if item.kind ~= "state" then
+      visible_count = visible_count + 1
+    end
+  end
+  local count_label = string.format("%d results", visible_count)
+  local loading_label = session.loading and (session.loading_label or "Loading connected code...")
+    or nil
   local history_back = #(vim.tbl_get(session, "history", "back") or {})
   local history_forward = #(vim.tbl_get(session, "history", "forward") or {})
   local history_label = nil
@@ -618,6 +625,7 @@ function M.render(session)
   local selected_item = session.visible_items[session.selection_index]
   local reason_label = selected_item and selected_item.reason or nil
   local explore_label = selected_item
+      and selected_item.kind ~= "state"
       and explore_target.resolve(selected_item, {
         project_root = session.project_root or session.cwd,
       }).top_label
