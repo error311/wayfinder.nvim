@@ -9,7 +9,7 @@ local paths = require("wayfinder.util.paths")
 
 local M = {}
 
-local facet_order = { "all", "calls", "refs", "tests", "git", "trail" }
+local facet_order = { "all", "calls", "refs", "tests", "git", "trail", "saved" }
 
 local function current()
   return state.current
@@ -485,6 +485,16 @@ function M.open_trail()
   rerender()
 end
 
+function M.open_saved_trails()
+  local session = current()
+  if not session then
+    return
+  end
+  open_facet(session, "saved")
+  state.set_notice("Saved Trails • <CR> load • S menu", 1800)
+  rerender()
+end
+
 function M.focus_list()
   layout.focus_primary()
 end
@@ -549,6 +559,27 @@ local function open_item(item, opener)
   if state_item_notice(item) then
     return
   end
+  if item and item.kind == "saved_trail" then
+    if opener ~= nil and opener ~= "edit" then
+      export_notice(session, "Wayfinder: Load saved Trails with <CR>")
+      return
+    end
+
+    local name = vim.tbl_get(item, "saved_trail", "name") or item.label
+    local loaded, err = trail_persistence.load(name)
+    if not loaded then
+      persistence_warn(err, name)
+      rerender()
+      return
+    end
+
+    open_facet(session, "trail")
+    session.selection_id = nil
+    session.selection_index = 1
+    rerender()
+    persistence_notice(string.format("Loaded Trail: %s", loaded.name))
+    return
+  end
   if not session or not item or not item.path then
     return
   end
@@ -602,6 +633,10 @@ end
 function M.pin()
   local item = selection_item()
   if state_item_notice(item) then
+    return
+  end
+  if item and item.kind == "saved_trail" then
+    export_notice(current(), "Wayfinder: Load the saved Trail before pinning rows")
     return
   end
   if item and trail.pin(item) then
@@ -659,6 +694,11 @@ end
 function M.remove_trail_item()
   local session = current()
   local item = selection_item()
+  if session and session.facet == "saved" and item and item.kind == "saved_trail" then
+    export_notice(session, "Wayfinder: Press S for saved Trail actions")
+    return
+  end
+
   if session and session.facet == "trail" and item then
     if trail.remove(item.id) then
       session.selection_id = nil
@@ -894,6 +934,7 @@ end
 function M.trail_menu()
   with_suspended_ui(function(done)
     vim.ui.select({
+      "Browse Saved Trails",
       "Save Trail",
       "Save Trail As",
       "Resume Last Trail",
@@ -903,7 +944,14 @@ function M.trail_menu()
     }, {
       prompt = "Wayfinder Trail menu",
     }, function(choice)
-      if choice == "Save Trail" then
+      if choice == "Browse Saved Trails" then
+        local session = current()
+        if session then
+          open_facet(session, "saved")
+          state.set_notice("Saved Trails • <CR> load • S menu", 1800)
+        end
+        done()
+      elseif choice == "Save Trail" then
         M.trail_save({ suspend = false, on_done = done })
       elseif choice == "Save Trail As" then
         M.trail_save_as({ suspend = false, on_done = done })

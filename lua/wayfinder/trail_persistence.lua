@@ -71,6 +71,15 @@ function M.list(opts)
   return trail_store.list(project_root, opts)
 end
 
+function M.entries(opts)
+  local project_root = resolve_project_root(opts)
+  if not project_root then
+    return nil, "missing_project_root"
+  end
+
+  return trail_store.entries(project_root, opts)
+end
+
 function M.saved_count(opts)
   local project_root = resolve_project_root(opts)
   if not project_root then

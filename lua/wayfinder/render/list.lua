@@ -34,6 +34,9 @@ local function icon_group(item)
   if item.source == "git" then
     return "WayfinderBadgeGit"
   end
+  if item.kind == "saved_trail" then
+    return "WayfinderTrail"
+  end
   return "WayfinderDim"
 end
 
@@ -52,6 +55,9 @@ local function badge_group(item)
   end
   if item.source == "git" then
     return "WayfinderBadgeGit"
+  end
+  if item.kind == "saved_trail" then
+    return "WayfinderTrail"
   end
   return "WayfinderDim"
 end
@@ -89,7 +95,7 @@ local function header_group(group)
   if group == "Recent Commits" then
     return "WayfinderDim"
   end
-  if group == "Pinned Trail" or group == "Explore Targets" then
+  if group == "Pinned Trail" or group == "Explore Targets" or group == "Saved Trails" then
     return "WayfinderTrail"
   end
   if group == "Pinned Rows" then
@@ -179,7 +185,12 @@ function M.rows(session)
         secondary_parts[#secondary_parts + 1] = item.detail
       end
     end
-    if selected and session.show_details and item.kind ~= "state" then
+    if
+      selected
+      and session.show_details
+      and item.kind ~= "state"
+      and item.kind ~= "saved_trail"
+    then
       secondary_parts[#secondary_parts + 1] = explore_target.resolve(item, {
         project_root = session.project_root or session.cwd,
       }).detail_label

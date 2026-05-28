@@ -524,6 +524,144 @@ test("state rows explain loading and unavailable sources without acting like cod
   state.current = nil
 end)
 
+test("saved Trails browse and load inside Wayfinder", function()
+  -- Guards the v0.3.0 saved-Trail surface so saved paths can be inspected before replacing the working Trail.
+  local root = vim.fs.normalize(vim.fn.tempname())
+  vim.fn.mkdir(root .. "/src", "p")
+  vim.fn.writefile({ '{ "name": "saved-trail-ui" }' }, root .. "/package.json")
+  local file_a = root .. "/src/auth.ts"
+  local file_b = root .. "/src/profile.ts"
+  vim.fn.writefile({ "export const authTrail = true" }, file_a)
+  vim.fn.writefile({ "export const profileTrail = true" }, file_b)
+
+  assert(t.trail_store.set(root, {
+    name = "auth bug",
+    items = {
+      {
+        id = "auth-row",
+        label = "authTrail",
+        path = file_a,
+        lnum = 1,
+        col = 14,
+        source = "lsp",
+        facet = "refs",
+      },
+    },
+  }))
+  assert(t.trail_store.set(root, {
+    name = "profile cleanup",
+    items = {
+      {
+        id = "profile-row",
+        label = "profileTrail",
+        path = file_b,
+        lnum = 1,
+        col = 14,
+        source = "lsp",
+        facet = "refs",
+      },
+    },
+  }))
+
+  vim.cmd.edit(file_a)
+  vim.bo[vim.api.nvim_get_current_buf()].filetype = "typescript"
+  trail.clear()
+  wayfinder.open()
+  state.attach_saved_trail("auth bug", {
+    project_root = root,
+    dirty = true,
+  })
+
+  actions.open_saved_trails()
+
+  assert_ok(state.current.facet == "saved", "expected Saved facet")
+  assert_ok(state.current.counts.saved == 2, "expected saved Trail count")
+  assert_ok(state.current.visible_items[1].kind == "saved_trail", "expected saved Trail rows")
+  assert_ok(state.current.visible_items[1].badge == "ACTIVE", "expected active saved Trail marker")
+  assert_ok(
+    string.find(state.current.visible_items[1].secondary, "modified", 1, true) ~= nil,
+    "expected dirty saved Trail marker"
+  )
+  assert_ok(
+    string.find(
+      vim.api.nvim_buf_get_lines(state.ui.top_buf, 0, 1, false)[1] or "",
+      "Explore unavailable",
+      1,
+      true
+    ) == nil,
+    "saved Trail rows should not show code-explore chrome"
+  )
+
+  preview.render(state.current, state.ui.preview, state.current.visible_items[1])
+  local preview_lines =
+    table.concat(vim.api.nvim_buf_get_lines(state.ui.preview_buf, 0, -1, false), "\n")
+  assert_ok(
+    string.find(preview_lines, "authTrail", 1, true) ~= nil,
+    "expected saved Trail preview to show saved items"
+  )
+  assert_ok(
+    not string.find(preview_lines, "1 item\n  1 item", 1, true),
+    "expected saved Trail preview not to repeat item count"
+  )
+
+  state.current.filter = "does-not-match"
+  state.current.selection_id = nil
+  state.current.selection_index = 1
+  state.current:refresh_visible()
+  assert_ok(
+    state.current.visible_items[1].label == "No matches for /does-not-match",
+    "expected saved Trail filter misses to explain the filter"
+  )
+  state.current.filter = ""
+  state.current.selection_id = nil
+  state.current.selection_index = 1
+  state.current:refresh_visible()
+
+  actions.open_split()
+  assert_ok(state.current.facet == "saved", "split on a saved Trail should not load it")
+  assert_ok(#trail.items() == 0, "split on a saved Trail should not replace the working Trail")
+
+  actions.jump()
+  assert_ok(state.current.facet == "trail", "loading a saved Trail should show the working Trail")
+  assert_ok(#trail.items() == 1, "expected loaded saved Trail to replace working Trail")
+  assert_ok(trail.items()[1].label == "authTrail", "expected selected saved Trail to load")
+
+  layout.close()
+  if state.current and state.current.cancel then
+    state.current:cancel()
+  end
+  trail.clear()
+  state.reset_trail_persistence()
+  state.current = nil
+end)
+
+test("S opens the Trail menu instead of jumping straight to Saved", function()
+  -- Keeps saved Trail browsing discoverable without taking over the long-standing S menu.
+  local saved_select = vim.ui.select
+  local selected_items
+  local selected_prompt
+  vim.ui.select = function(items, opts, callback)
+    selected_items = items
+    selected_prompt = opts and opts.prompt or nil
+    callback(nil)
+  end
+
+  state.current = {
+    facet = "refs",
+    visible_items = {},
+  }
+
+  actions.trail_menu()
+
+  assert_ok(state.current.facet == "refs", "S should not switch directly to Saved")
+  assert_ok(selected_prompt == "Wayfinder Trail menu", "expected Trail menu prompt")
+  assert_ok(selected_items and selected_items[1] == "Browse Saved Trails", "expected browse action")
+  assert_ok(selected_items[2] == "Save Trail", "expected save action to stay near the top")
+
+  vim.ui.select = saved_select
+  state.current = nil
+end)
+
 test("hint bar toggle gives pane rows back and remembers runtime preference", function()
   -- Guards the learned-user path so key hints can get out of the way without wasting layout space.
   local saved_show_hints = config.values.layout.show_hints

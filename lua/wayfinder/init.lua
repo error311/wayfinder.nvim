@@ -4,6 +4,7 @@ local layout = require("wayfinder.layout")
 local actions = require("wayfinder.actions")
 local highlights = require("wayfinder.highlights")
 local trail = require("wayfinder.trail")
+local trail_persistence = require("wayfinder.trail_persistence")
 local symbol_util = require("wayfinder.util.symbol")
 local items = require("wayfinder.util.items")
 local paths = require("wayfinder.util.paths")
@@ -163,11 +164,16 @@ local function build_counts(session)
     tests = 0,
     git = 0,
     trail = #trail.items(),
+    saved = 0,
   }
 
   for _, item in ipairs(session.items) do
     counts[item.facet] = (counts[item.facet] or 0) + 1
     counts.all = counts.all + 1
+  end
+
+  if session.project_root then
+    counts.saved = trail_persistence.saved_count({ project_root = session.project_root }) or 0
   end
 
   session.counts = counts
@@ -188,6 +194,9 @@ local function loading_sources(session)
     return source_loading(session, "git") and { "git" } or {}
   end
   if session.facet == "trail" then
+    return {}
+  end
+  if session.facet == "saved" then
     return {}
   end
 
@@ -239,6 +248,14 @@ local function empty_state_item(session)
     return state_item("loading::" .. session.facet, loading, "Wayfinder is still gathering rows.")
   end
 
+  if session.filter and session.filter ~= "" then
+    return state_item(
+      "empty::filter",
+      "No matches for /" .. session.filter,
+      "Clear the filter with <C-l> or search for a different term."
+    )
+  end
+
   if session.facet == "trail" then
     return state_item(
       "empty::trail",
@@ -247,11 +264,11 @@ local function empty_state_item(session)
     )
   end
 
-  if session.filter and session.filter ~= "" then
+  if session.facet == "saved" then
     return state_item(
-      "empty::filter",
-      "No matches for /" .. session.filter,
-      "Clear the filter with <C-l> or search for a different term."
+      "empty::saved",
+      "No saved Trails",
+      "Press S for Trail save and management actions."
     )
   end
 
@@ -320,10 +337,69 @@ local function empty_state_item(session)
   return state_item("empty::all", "No connected code found", "All sources finished without rows.")
 end
 
+local function saved_trail_marker_parts(session, entry)
+  local parts = {}
+  local meta = state.trail_persistence_state()
+  local active_here = meta.project_root == session.project_root
+    and meta.active_name == entry.name
+    and meta.detached == false
+
+  if active_here and meta.dirty then
+    parts[#parts + 1] = "modified"
+  end
+
+  return parts, active_here
+end
+
+local function saved_trail_item(session, entry)
+  local trail_items = entry.items or {}
+  local count = #trail_items
+  local markers, active = saved_trail_marker_parts(session, entry)
+  local secondary = string.format("%d item%s", count, count == 1 and "" or "s")
+  if #markers > 0 then
+    secondary = secondary .. "  •  " .. table.concat(markers, "  •  ")
+  end
+
+  return {
+    id = "saved_trail::" .. entry.name,
+    facet = "saved",
+    kind = "saved_trail",
+    source = "wayfinder",
+    badge = active and "ACTIVE" or (entry.last_active and "LAST" or "SAVED"),
+    label = entry.name,
+    secondary = secondary,
+    detail = "Saved Trail",
+    reason = active and "active saved Trail" or "saved Trail",
+    icon = config.values.icons.trail,
+    group = "Saved Trails",
+    saved_trail = entry,
+  }
+end
+
+local function saved_trail_items(session)
+  local entries, err = trail_persistence.entries({ project_root = session.project_root })
+  if not entries then
+    return { state_item("unavailable::saved", "Saved Trails unavailable", err) }
+  end
+
+  if #entries == 0 then
+    return { empty_state_item(session) }
+  end
+
+  return vim.tbl_map(function(entry)
+    return saved_trail_item(session, entry)
+  end, entries)
+end
+
 local function filtered_items(session)
   local all_items = {}
+
+  if session.facet == "saved" then
+    all_items = saved_trail_items(session)
+  end
+
   for _, item in ipairs(session.items) do
-    if session.facet == "all" or session.facet == item.facet then
+    if session.facet ~= "saved" and (session.facet == "all" or session.facet == item.facet) then
       item.pinned = trail.has(item.id)
       table.insert(all_items, item)
     end
@@ -528,6 +604,7 @@ local function create_session(opts)
       tests = 0,
       git = 0,
       trail = #trail.items(),
+      saved = 0,
     },
     items = {},
     visible_items = {},

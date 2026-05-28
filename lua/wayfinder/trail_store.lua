@@ -242,6 +242,27 @@ function M.list(project_root, opts)
   return names
 end
 
+function M.entries(project_root, opts)
+  local data, err = M.read_project(project_root, opts)
+  if not data then
+    return nil, err
+  end
+
+  local found = {}
+  for name, entry in pairs(data.trails) do
+    local saved = vim.deepcopy(entry)
+    saved.name = name
+    saved.last_active = data.last_active == name
+    found[#found + 1] = saved
+  end
+
+  table.sort(found, function(a, b)
+    return (a.name or "") < (b.name or "")
+  end)
+
+  return found
+end
+
 function M.count(project_root, opts)
   local names, err = M.list(project_root, opts)
   if not names then

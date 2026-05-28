@@ -36,6 +36,7 @@ It gathers:
   - recent commits
 
 The Trail facet lets you pin items while exploring.
+The Saved facet lets you inspect project saved Trails before loading one.
 Use `e` on a code result to explore from that symbol/location without leaving
 the picker. The top bar shows what `e` will explore for the selected row, and
 `D` details include the exact target location when there is room. Use `b` and
@@ -241,6 +242,10 @@ Inside Wayfinder:
 
   S
       Open the Trail menu for save/resume/load/rename/delete actions.
+
+      The menu also includes Browse Saved Trails, which opens the Saved facet.
+      Saved Trails render as rows with item counts and active/last markers.
+      Press <CR> on a saved Trail to load it into the working Trail.
 
   [ / ]
       Cycle through saved Trails for the current project.

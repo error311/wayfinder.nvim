@@ -626,6 +626,7 @@ function M.render(session)
   local reason_label = selected_item and selected_item.reason or nil
   local explore_label = selected_item
       and selected_item.kind ~= "state"
+      and selected_item.kind ~= "saved_trail"
       and explore_target.resolve(selected_item, {
         project_root = session.project_root or session.cwd,
       }).top_label

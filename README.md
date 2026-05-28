@@ -32,7 +32,7 @@ Pin useful stops into Trail while you explore, then save that Trail per project 
 - `b` / `f` move backward and forward through explore history
 - Top bar shows the selected row's explore target before pivoting
 - Trail pins selected rows, current targets, and explore paths
-- Persistent named Trails per project
+- Saved Trail browser with preview before loading
 - Toggleable bottom key hints
 - Progressive, cancelable LSP, test, text, and git sources
 - Compact loading, empty, and unavailable states
@@ -71,7 +71,7 @@ If there is no symbol under the cursor, Wayfinder falls back to the current file
 ## Typical Flow
 
 1. Open Wayfinder on the current symbol or file.
-2. Move across `Calls`, `Refs`, `Tests`, `Git`, and `Trail`.
+2. Move across `Calls`, `Refs`, `Tests`, `Git`, `Trail`, and `Saved`.
 3. Use preview to confirm the right match before jumping.
 4. Press `e` to explore from the selected code result.
 5. Use `b` / `f` to move through explore history.
@@ -114,10 +114,12 @@ Trail is the breadcrumb list you build while exploring.
 - `a` pins the current Wayfinder target.
 - `A` pins the current explore path.
 - Trail groups explicit explore targets separately from selected row pins.
-- `S` opens save, resume, load, rename, and delete actions.
+- `S` opens save, resume, load, rename, delete, and saved Trail browse actions.
+- The `Saved` facet shows saved Trails as rows with item counts, active/last markers, and preview.
+- In the Saved facet, `<CR>` loads the selected saved Trail.
 - Saved Trails are project-scoped and stored under Neovim state, not in your repo.
 
-Normal `:Wayfinder` opens do not auto-load saved Trails. Use `:WayfinderTrailResume` or the Trail menu when you want to restore the last active saved Trail.
+Normal `:Wayfinder` opens do not auto-load saved Trails. Use `:WayfinderTrailResume`, `[` / `]`, the Trail menu, or the Saved facet when you want to restore a saved Trail.
 
 ## Explore
 

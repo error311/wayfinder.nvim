@@ -46,6 +46,13 @@ local facets = {
       return config.values.icons.trail
     end,
   },
+  {
+    key = "saved",
+    label = "Saved",
+    icon = function()
+      return config.values.icons.trail
+    end,
+  },
 }
 
 function M.rows(session)
@@ -80,7 +87,7 @@ function M.rows(session)
       glue_end = glue_start + #glue,
       count_start = count_start,
       count_end = count_start + #count_text,
-      accent = facet.key == "trail" and (count or 0) > 0,
+      accent = (facet.key == "trail" or facet.key == "saved") and (count or 0) > 0,
     })
   end
   return rows

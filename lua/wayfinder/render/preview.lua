@@ -239,6 +239,49 @@ local function render_git_preview(session, item, token)
   end)
 end
 
+local function saved_trail_location(session, trail_item)
+  if not trail_item or not trail_item.path then
+    return "missing location"
+  end
+
+  local display = paths.display(trail_item.path, session.project_root or session.cwd)
+  if trail_item.lnum then
+    return string.format("%s:%d", display, trail_item.lnum)
+  end
+  return display
+end
+
+local function render_saved_trail_preview(session, item)
+  local entry = item.saved_trail or {}
+  local trail_items = entry.items or {}
+  local item_count = #trail_items
+  local lines = {
+    "  " .. (entry.name or item.label or "Saved Trail"),
+    "",
+    string.format("  %d item%s", item_count, item_count == 1 and "" or "s"),
+  }
+
+  if item.badge == "ACTIVE" then
+    lines[#lines + 1] = "  active saved Trail"
+  elseif item.badge == "LAST" then
+    lines[#lines + 1] = "  last active saved Trail"
+  end
+
+  lines[#lines + 1] = ""
+
+  if item_count == 0 then
+    lines[#lines + 1] = "  Empty saved Trail."
+  else
+    for index, trail_item in ipairs(trail_items) do
+      local label = trail_item.label or trail_item.detail or vim.fs.basename(trail_item.path or "")
+      lines[#lines + 1] = string.format("  %02d  %s", index, label ~= "" and label or "Trail item")
+      lines[#lines + 1] = "      " .. saved_trail_location(session, trail_item)
+    end
+  end
+
+  render_lines(session, nil, "", lines)
+end
+
 function M.render(session, winid, item)
   ensure_buffer()
   session.preview_token = (session.preview_token or 0) + 1
@@ -259,6 +302,11 @@ function M.render(session, winid, item)
       "",
       "  " .. (item.detail or item.reason or "No code location is available."),
     })
+    return
+  end
+
+  if item.kind == "saved_trail" then
+    render_saved_trail_preview(session, item)
     return
   end
 

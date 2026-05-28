@@ -1,5 +1,17 @@
 # Changelog
 
+## v0.3.0 - 2026-05-28
+
+Saved Trails are now first-class inside Wayfinder.
+
+- Added a `Saved` facet for project saved Trails, available from the Trail menu and facet navigation.
+- Saved Trail rows show item counts plus active, modified, and last-active state.
+- The preview pane now shows the ordered contents of a saved Trail before loading it.
+- Pressing `<CR>` on a saved Trail loads it into the working Trail and switches to the Trail facet.
+- The `S` Trail menu keeps the existing save/resume/load/rename/delete flow and now includes `Browse Saved Trails`.
+
+---
+
 ## v0.2.9 - 2026-05-15
 
 Empty, loading, and unavailable states now explain themselves inside the picker.
