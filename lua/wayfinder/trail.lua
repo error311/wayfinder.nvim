@@ -1,4 +1,5 @@
 local state = require("wayfinder.state")
+local items = require("wayfinder.util.items")
 
 local M = {}
 
@@ -8,10 +9,6 @@ local function normalize_index(index, count)
   end
 
   return ((index - 1) % count) + 1
-end
-
-local function valid_item(item)
-  return item and item.path and item.path ~= "" and vim.uv.fs_stat(item.path) ~= nil
 end
 
 local function set_cursor(index)
@@ -44,7 +41,7 @@ function M.valid_items()
   local found = {}
 
   for _, item in ipairs(state.trail) do
-    if valid_item(item) then
+    if items.is_available(item) then
       found[#found + 1] = vim.deepcopy(item)
     end
   end
@@ -138,7 +135,7 @@ function M.seek(delta, opts)
     end
 
     local item = state.trail[index]
-    if valid_item(item) then
+    if items.is_available(item) then
       state.trail_cursor = index
       return vim.deepcopy(item), index
     end

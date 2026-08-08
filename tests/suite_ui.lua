@@ -531,6 +531,7 @@ test("saved Trails browse and load inside Wayfinder", function()
   vim.fn.writefile({ '{ "name": "saved-trail-ui" }' }, root .. "/package.json")
   local file_a = root .. "/src/auth.ts"
   local file_b = root .. "/src/profile.ts"
+  local missing_file = root .. "/src/removed.ts"
   vim.fn.writefile({ "export const authTrail = true" }, file_a)
   vim.fn.writefile({ "export const profileTrail = true" }, file_b)
 
@@ -543,6 +544,15 @@ test("saved Trails browse and load inside Wayfinder", function()
         path = file_a,
         lnum = 1,
         col = 14,
+        source = "lsp",
+        facet = "refs",
+      },
+      {
+        id = "removed-row",
+        label = "removedTrailTarget",
+        path = missing_file,
+        lnum = 1,
+        col = 1,
         source = "lsp",
         facet = "refs",
       },
@@ -583,6 +593,10 @@ test("saved Trails browse and load inside Wayfinder", function()
     "expected dirty saved Trail marker"
   )
   assert_ok(
+    string.find(state.current.visible_items[1].secondary, "1 missing", 1, true) ~= nil,
+    "expected saved Trail row to count missing entries"
+  )
+  assert_ok(
     string.find(
       vim.api.nvim_buf_get_lines(state.ui.top_buf, 0, 1, false)[1] or "",
       "Explore unavailable",
@@ -602,6 +616,10 @@ test("saved Trails browse and load inside Wayfinder", function()
   assert_ok(
     not string.find(preview_lines, "1 item\n  1 item", 1, true),
     "expected saved Trail preview not to repeat item count"
+  )
+  assert_ok(
+    string.find(preview_lines, "removedTrailTarget  [MISSING]", 1, true) ~= nil,
+    "expected saved Trail preview to mark missing entries"
   )
 
   state.current.filter = "does-not-match"
@@ -623,8 +641,48 @@ test("saved Trails browse and load inside Wayfinder", function()
 
   actions.jump()
   assert_ok(state.current.facet == "trail", "loading a saved Trail should show the working Trail")
-  assert_ok(#trail.items() == 1, "expected loaded saved Trail to replace working Trail")
+  assert_ok(#trail.items() == 2, "expected loaded saved Trail to preserve missing entries")
   assert_ok(trail.items()[1].label == "authTrail", "expected selected saved Trail to load")
+  assert_ok(state.current.visible_items[2].missing == true, "expected missing working Trail row")
+  local list_lines = table.concat(vim.api.nvim_buf_get_lines(state.ui.list_buf, 0, -1, false), "\n")
+  assert_ok(
+    string.find(list_lines, "[MISSING]", 1, true) ~= nil,
+    "expected working Trail row to show missing badge"
+  )
+
+  state.current.selection_index = 2
+  state.current.selection_id = state.current.visible_items[2].id
+  preview.render(state.current, state.ui.preview, state.current.visible_items[2])
+  preview_lines = table.concat(vim.api.nvim_buf_get_lines(state.ui.preview_buf, 0, -1, false), "\n")
+  assert_ok(
+    string.find(preview_lines, "File is no longer available", 1, true) ~= nil,
+    "expected missing working Trail preview"
+  )
+
+  actions.jump()
+  assert_ok(
+    state.current and state.current.facet == "trail",
+    "missing jump should keep Wayfinder open"
+  )
+  assert_ok(vim.fn.bufnr(missing_file) == -1, "missing jump should not create an empty buffer")
+  assert_ok(
+    state.notice_text() == "Wayfinder: Selected file is no longer available",
+    "expected missing jump notice"
+  )
+
+  actions.open_split()
+  assert_ok(
+    state.current and state.current.facet == "trail",
+    "missing split should keep Wayfinder open"
+  )
+  assert_ok(vim.fn.bufnr(missing_file) == -1, "missing split should not create an empty buffer")
+
+  actions.remove_trail_item()
+  assert_ok(#trail.items() == 1, "expected dd cleanup to remove the missing Trail item")
+  assert_ok(
+    state.trail_persistence.dirty == true,
+    "expected cleanup to mark the loaded Trail modified"
+  )
 
   layout.close()
   if state.current and state.current.cancel then
@@ -633,6 +691,36 @@ test("saved Trails browse and load inside Wayfinder", function()
   trail.clear()
   state.reset_trail_persistence()
   state.current = nil
+end)
+
+test("all-missing Trail export reports invalid entries instead of an empty Trail", function()
+  -- Keeps stale Trail reporting accurate when quickfix has no valid locations to receive.
+  local saved_notify = vim.notify
+  local message
+  vim.notify = function(text)
+    message = text
+  end
+
+  trail.clear({ dirty = false })
+  assert_ok(
+    trail.pin({
+      id = "missing-export",
+      label = "missing export",
+      path = vim.fs.normalize(vim.fn.tempname() .. "/gone.lua"),
+      lnum = 1,
+      col = 1,
+    }),
+    "pin missing export item"
+  )
+
+  wayfinder.export_trail_quickfix()
+  vim.notify = saved_notify
+
+  assert_ok(
+    message == "Wayfinder: Trail has no valid entries",
+    "expected accurate stale export notice"
+  )
+  trail.clear({ dirty = false })
 end)
 
 test("S opens the Trail menu instead of jumping straight to Saved", function()

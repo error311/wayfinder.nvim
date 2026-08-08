@@ -354,7 +354,11 @@ end
 local function saved_trail_item(session, entry)
   local trail_items = entry.items or {}
   local count = #trail_items
+  local missing = items.missing_count(trail_items)
   local markers, active = saved_trail_marker_parts(session, entry)
+  if missing > 0 then
+    markers[#markers + 1] = string.format("%d missing", missing)
+  end
   local secondary = string.format("%d item%s", count, count == 1 and "" or "s")
   if #markers > 0 then
     secondary = secondary .. "  •  " .. table.concat(markers, "  •  ")
@@ -373,6 +377,7 @@ local function saved_trail_item(session, entry)
     icon = config.values.icons.trail,
     group = "Saved Trails",
     saved_trail = entry,
+    missing_count = missing,
   }
 end
 
@@ -431,8 +436,14 @@ local function filtered_items(session)
         end
       end
       local previous = group_items[group_index - 1]
-      local destination =
-        string.format("%s:%d", paths.display(item.path, session.project_root), item.lnum or 1)
+      item.missing = not items.is_available(item)
+      local destination = item.path
+          and item.path ~= ""
+          and string.format("%s:%d", paths.display(item.path, session.project_root), item.lnum or 1)
+        or "missing location"
+      if item.missing then
+        destination = destination .. "  •  missing"
+      end
 
       item.icon = group_index == 1 and config.values.icons.trail or "↳"
       item.group = item.kind == "target" and item.source == "wayfinder" and "Explore Targets"

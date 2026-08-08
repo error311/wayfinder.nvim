@@ -1,8 +1,10 @@
+local items = require("wayfinder.util.items")
+
 local M = {}
 
 function M.item(item, opener)
-  if not item or not item.path or item.path == "" then
-    return false
+  if not items.is_available(item) then
+    return false, "missing"
   end
 
   local target = vim.fn.fnameescape(item.path)

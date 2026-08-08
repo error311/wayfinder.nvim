@@ -21,7 +21,7 @@ function M.entries(found)
   local entries = {}
 
   for _, item in ipairs(found or {}) do
-    if item and item.path and item.path ~= "" then
+    if items.is_available(item) then
       entries[#entries + 1] = {
         filename = item.path,
         lnum = item.lnum or 1,

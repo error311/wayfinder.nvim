@@ -1,5 +1,6 @@
 local paths = require("wayfinder.util.paths")
 local symbol = require("wayfinder.util.symbol")
+local items = require("wayfinder.util.items")
 
 local M = {}
 
@@ -46,7 +47,7 @@ function M.resolve(item, opts)
   end
 
   local path = vim.fs.normalize(item.path)
-  if not path or vim.uv.fs_stat(path) == nil then
+  if not items.is_available({ path = path }) then
     return {
       explorable = false,
       label = "Missing file",

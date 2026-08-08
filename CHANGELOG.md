@@ -1,5 +1,17 @@
 # Changelog
 
+## v0.3.1 - 2026-08-08
+
+Saved Trails now stay clear and safe when files move or disappear.
+
+- Saved Trail rows and previews show how many entries are missing and mark the affected locations.
+- Loaded Trail rows keep missing entries visible for deliberate cleanup with `dd` instead of silently dropping them.
+- Jump and split actions no longer close Wayfinder or create empty buffers for missing Trail files.
+- Trail traversal and quickfix export skip missing locations and report all-missing Trails accurately.
+- Saved Trail storage now uses atomic file replacement so a failed write preserves the last good data.
+
+---
+
 ## v0.3.0 - 2026-05-28
 
 Saved Trails are now first-class inside Wayfinder.

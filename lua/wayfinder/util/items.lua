@@ -1,5 +1,24 @@
 local M = {}
 
+function M.is_available(item)
+  return item
+    and type(item.path) == "string"
+    and item.path ~= ""
+    and vim.uv.fs_stat(item.path) ~= nil
+end
+
+function M.missing_count(found)
+  local count = 0
+
+  for _, item in ipairs(found or {}) do
+    if not M.is_available(item) then
+      count = count + 1
+    end
+  end
+
+  return count
+end
+
 function M.item_id(parts)
   return table.concat(parts, "::")
 end
@@ -21,6 +40,10 @@ end
 function M.badge_text(item)
   if not item then
     return ""
+  end
+
+  if item.missing then
+    return "[MISSING]"
   end
 
   if item.source == "lsp" then

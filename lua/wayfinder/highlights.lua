@@ -18,6 +18,7 @@ local links = {
   WayfinderPreviewContext = "CursorLine",
   WayfinderPreviewTarget = "Search",
   WayfinderTrail = "DiffAdd",
+  WayfinderMissing = "DiagnosticWarn",
   WayfinderDim = "Comment",
 }
 

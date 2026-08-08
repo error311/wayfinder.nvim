@@ -240,6 +240,59 @@ test("trail store fails safely on invalid project storage", function()
   assert_ok(err == "invalid_json", "expected invalid storage error")
 end)
 
+test("trail store preserves the last good file when atomic replacement fails", function()
+  -- Guards saved Trails against partial replacement when the final filesystem rename cannot complete.
+  local state_root = vim.fs.normalize(vim.fn.tempname())
+  local project_root = git_fixture_root
+  local opts = { state_root = state_root }
+
+  assert(trail_store.set(project_root, {
+    name = "auth bug",
+    items = {
+      {
+        id = "trail-a",
+        label = "trail a",
+        path = project_root .. "/src/user_service.ts",
+        lnum = 1,
+        col = 1,
+      },
+    },
+  }, opts))
+
+  local storage_file = assert(trail_store.project_file(project_root, opts))
+  local before = table.concat(vim.fn.readfile(storage_file), "\n")
+  local saved_rename = vim.uv.fs_rename
+  vim.uv.fs_rename = function()
+    return nil, "forced rename failure"
+  end
+
+  local call_ok, updated, err = pcall(trail_store.set, project_root, {
+    name = "second trail",
+    items = {
+      {
+        id = "trail-b",
+        label = "trail b",
+        path = project_root .. "/tests/user_service_test.ts",
+        lnum = 1,
+        col = 1,
+      },
+    },
+  }, opts)
+  vim.uv.fs_rename = saved_rename
+
+  assert_ok(call_ok, updated)
+  assert_ok(updated == nil, "expected failed atomic replacement")
+  assert_ok(err == "write_failed", "expected stable write failure")
+  assert_ok(
+    table.concat(vim.fn.readfile(storage_file), "\n") == before,
+    "failed replacement should preserve the previous storage file"
+  )
+  assert_ok(
+    #vim.fn.glob(storage_file .. ".tmp.*", false, true) == 0,
+    "failed replacement should remove its temporary file"
+  )
+end)
+
 test("trail persistence refuses to save an empty Trail", function()
   -- Guards the explicit-save flow so persistence stays opt-in and empty Trails do not create junk storage.
   trail.clear()

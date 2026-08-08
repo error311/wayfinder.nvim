@@ -4,6 +4,7 @@ local state = require("wayfinder.state")
 local trail = require("wayfinder.trail")
 local trail_persistence = require("wayfinder.trail_persistence")
 local open = require("wayfinder.util.open")
+local items = require("wayfinder.util.items")
 local facets = require("wayfinder.render.facets")
 local paths = require("wayfinder.util.paths")
 
@@ -236,6 +237,9 @@ local function persistence_error_message(err, name)
   end
   if err == "encode_failed" then
     return "Wayfinder: Unable to encode Trail storage"
+  end
+  if err == "write_failed" then
+    return "Wayfinder: Unable to write saved Trail storage"
   end
   if err == "invalid_trail" then
     return "Wayfinder: Saved Trail data is invalid"
@@ -580,7 +584,11 @@ local function open_item(item, opener)
     persistence_notice(string.format("Loaded Trail: %s", loaded.name))
     return
   end
-  if not session or not item or not item.path then
+  if not session or not item then
+    return
+  end
+  if not items.is_available(item) then
+    export_notice(session, "Wayfinder: Selected file is no longer available")
     return
   end
 
@@ -979,9 +987,7 @@ function M.export_quickfix()
 
   local found = session.visible_items
   if session.facet == "trail" then
-    found = vim.tbl_filter(function(item)
-      return item and item.path and item.path ~= "" and vim.uv.fs_stat(item.path) ~= nil
-    end, session.visible_items)
+    found = vim.tbl_filter(items.is_available, session.visible_items)
   end
 
   local count = quickfix.export(found, {
@@ -991,9 +997,12 @@ function M.export_quickfix()
 end
 
 function M.export_trail_quickfix()
+  local all_items = trail.items()
   local found = trail.valid_items()
   if #found == 0 then
-    vim.notify("Wayfinder: Trail is empty", vim.log.levels.INFO)
+    local message = #all_items == 0 and "Wayfinder: Trail is empty"
+      or "Wayfinder: Trail has no valid entries"
+    vim.notify(message, vim.log.levels.INFO)
     return
   end
 

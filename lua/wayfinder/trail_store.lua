@@ -201,6 +201,53 @@ local function encode_project_data(data)
   return encoded
 end
 
+local function write_file_atomic(path, content)
+  local fd, temp_path = vim.uv.fs_mkstemp(path .. ".tmp.XXXXXX")
+  if not fd then
+    return nil, "write_failed"
+  end
+
+  local function discard_temp()
+    if fd then
+      pcall(vim.uv.fs_close, fd)
+      fd = nil
+    end
+    if temp_path then
+      pcall(vim.uv.fs_unlink, temp_path)
+    end
+  end
+
+  local offset = 0
+  while offset < #content do
+    local written = vim.uv.fs_write(fd, content:sub(offset + 1), offset)
+    if not written or written <= 0 then
+      discard_temp()
+      return nil, "write_failed"
+    end
+    offset = offset + written
+  end
+
+  if not vim.uv.fs_fsync(fd) then
+    discard_temp()
+    return nil, "write_failed"
+  end
+
+  local closed = vim.uv.fs_close(fd)
+  if not closed then
+    discard_temp()
+    return nil, "write_failed"
+  end
+  fd = nil
+
+  if not vim.uv.fs_rename(temp_path, path) then
+    discard_temp()
+    return nil, "write_failed"
+  end
+
+  temp_path = nil
+  return true
+end
+
 function M.write_project(project_root, data, opts)
   local root = normalize_project_root(project_root)
   if not root or root == "" then
@@ -217,9 +264,8 @@ function M.write_project(project_root, data, opts)
     return nil, "encode_failed"
   end
 
-  local write_ok, write_err =
-    pcall(vim.fn.writefile, vim.split(encoded, "\n", { plain = true }), path)
-  if not write_ok then
+  local written, write_err = write_file_atomic(path, encoded .. "\n")
+  if not written then
     return nil, write_err
   end
 

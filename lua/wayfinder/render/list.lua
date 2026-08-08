@@ -22,6 +22,9 @@ local function icon_group(item)
   if not item then
     return "WayfinderNormal"
   end
+  if item.missing then
+    return "WayfinderMissing"
+  end
   if item.source == "grep" then
     return "WayfinderDim"
   end
@@ -43,6 +46,9 @@ end
 local function badge_group(item)
   if not item then
     return "WayfinderNormal"
+  end
+  if item.missing then
+    return "WayfinderMissing"
   end
   if item.source == "lsp" then
     return "WayfinderBadgeLsp"
@@ -66,6 +72,9 @@ local function label_group(item)
   if not item then
     return "WayfinderLabel"
   end
+  if item.missing then
+    return "WayfinderDim"
+  end
   if item.source == "grep" then
     return "WayfinderBadgeText"
   end
@@ -75,6 +84,9 @@ end
 local function secondary_group(item)
   if not item then
     return "WayfinderPath"
+  end
+  if item.missing then
+    return "WayfinderDim"
   end
   if item.source == "grep" then
     return "WayfinderDim"

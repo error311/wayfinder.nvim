@@ -116,8 +116,11 @@ Trail is the breadcrumb list you build while exploring.
 - Trail groups explicit explore targets separately from selected row pins.
 - `S` opens save, resume, load, rename, delete, and saved Trail browse actions.
 - The `Saved` facet shows saved Trails as rows with item counts, active/last markers, and preview.
+- Missing Trail files stay visible and are marked in Saved and working Trail views.
 - In the Saved facet, `<CR>` loads the selected saved Trail.
 - Saved Trails are project-scoped and stored under Neovim state, not in your repo.
+
+Wayfinder never removes missing entries automatically. Load the saved Trail, remove stale rows with `dd`, then use `S` to save the cleaned Trail.
 
 Normal `:Wayfinder` opens do not auto-load saved Trails. Use `:WayfinderTrailResume`, `[` / `]`, the Trail menu, or the Saved facet when you want to restore a saved Trail.
 

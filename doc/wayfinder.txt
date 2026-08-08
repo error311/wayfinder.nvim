@@ -247,6 +247,15 @@ Inside Wayfinder:
       Saved Trails render as rows with item counts and active/last markers.
       Press <CR> on a saved Trail to load it into the working Trail.
 
+Missing Trail entries:
+
+  - Saved rows and previews show missing-file counts and markers.
+  - Loading preserves missing entries instead of silently changing saved data.
+  - Jump and split actions keep Wayfinder open when the selected file is missing.
+  - Trail traversal and quickfix export skip missing locations.
+  - Use dd in the working Trail to remove a stale row, then use S to save the
+    cleaned Trail explicitly.
+
   [ / ]
       Cycle through saved Trails for the current project.
 

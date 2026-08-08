@@ -1,4 +1,5 @@
 local async = require("wayfinder.util.async")
+local items = require("wayfinder.util.items")
 local paths = require("wayfinder.util.paths")
 local state = require("wayfinder.state")
 local text = require("wayfinder.util.text")
@@ -255,10 +256,15 @@ local function render_saved_trail_preview(session, item)
   local entry = item.saved_trail or {}
   local trail_items = entry.items or {}
   local item_count = #trail_items
+  local missing_count = items.missing_count(trail_items)
+  local count_label = string.format("  %d item%s", item_count, item_count == 1 and "" or "s")
+  if missing_count > 0 then
+    count_label = count_label .. string.format("  •  %d missing", missing_count)
+  end
   local lines = {
     "  " .. (entry.name or item.label or "Saved Trail"),
     "",
-    string.format("  %d item%s", item_count, item_count == 1 and "" or "s"),
+    count_label,
   }
 
   if item.badge == "ACTIVE" then
@@ -274,6 +280,9 @@ local function render_saved_trail_preview(session, item)
   else
     for index, trail_item in ipairs(trail_items) do
       local label = trail_item.label or trail_item.detail or vim.fs.basename(trail_item.path or "")
+      if not items.is_available(trail_item) then
+        label = (label ~= "" and label or "Trail item") .. "  [MISSING]"
+      end
       lines[#lines + 1] = string.format("  %02d  %s", index, label ~= "" and label or "Trail item")
       lines[#lines + 1] = "      " .. saved_trail_location(session, trail_item)
     end
@@ -307,6 +316,15 @@ function M.render(session, winid, item)
 
   if item.kind == "saved_trail" then
     render_saved_trail_preview(session, item)
+    return
+  end
+
+  if not items.is_available(item) then
+    render_lines(session, item, "", {
+      "  File is no longer available",
+      "",
+      "  This Trail location may have been moved or deleted.",
+    })
     return
   end
 
